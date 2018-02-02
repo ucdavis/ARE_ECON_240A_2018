@@ -1,0 +1,116 @@
+---
+title: "Assignment3"
+author: "Shanchao Wang, Yijing (Olivia) Wang (ARE), Kaiwen Wang"
+date: "1/30/2018"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(ggplot2)
+library(sandwich)
+library(lmtest)
+library(stargazer)
+```
+
+## x-y plot with leverage
+
+```{r}
+l_projection = function(s){
+   dat   = data.frame(x = rchisq(s, df=1), e = rnorm(s))
+   dat   = mutate(dat, y = x^2 + e)
+   res   = lm(y ~ x, data = dat)
+   res   = list(coefficients = res$coefficients, dat = mutate(dat, leverage = hatvalues(res)))
+  return(res)
+}
+temp = l_projection(100)
+ggplot(aes(x = x, y = y, size = leverage), data = temp[[2]]) +
+  geom_point()
+```
+
+The more extreme the sample points, the larger the laverage will be. 
+
+## OLS estimator with HC covariance
+
+```{r results = 'asis'}
+hcols = function(sig = 1){
+  dat           = data.frame(D = c(rep(1,3),rep(0,27)), y = c(rnorm(3,0,1), rnorm(27,0,sig)))
+  model         = lm(y ~ D, data = dat)
+  beta          = model$coefficient[2] # extract coefficient beta1
+  H0            = summary(model)$coefficient[2,2:4]  # extract standard error and t
+  HC1           = coeftest(model, vcov. = vcovHC(model,type = "HC1"))[2,2:4]
+  sigmas        = c(rep(1,3),rep(sig,27))
+  HCora         = coeftest(model, vcov. = vcovHC(model,omega = (30/28)*sigmas^2))[2,2:4]
+  sterr         = as.matrix(cbind(H0,HC1,HCora))
+  sterr[3,]     = as.numeric(sterr[3,] <= 0.05) 
+  out           = c(beta,c(sterr))
+  res           = as.data.frame(matrix(NA,nrow=1, ncol = length(out)))
+  colnames(res) = c("beta","H0_std","H0_t","H0_count","HC1_std","HC1_t","HC1_count","HCora_std","HCora_t","HCora_count")
+  res[1,]       = out
+  return(res)
+}
+
+reptable = function(s = 10000){
+  gridvalue = expand.grid(1:s, sig = c(0.5,1))
+  out       = mapply(hcols,sig = gridvalue$sig, SIMPLIFY = F) %>% bind_rows() 
+  index1    = c((s+1):(2*s))
+  beta      = data.frame("High_HC" = c(mean(out[1:s,1]),sd(out[1:s,1])), 
+                         "No_HC"   = c(mean(out[index1,1]),sd(out[index1,1])))
+  row.names(beta) = c("Mean","Standard Deviation")
+  hihc      = data.frame("H0"    = c(mean(out[1:s,2]),sd(out[1:s,2]),mean(out[1:s,3]),mean(out[1:s,4])),
+                         "HC1"   = c(mean(out[1:s,5]),sd(out[1:s,5]),mean(out[1:s,6]),mean(out[1:s,7])),
+                         "HCora" = c(mean(out[1:s,8]),sd(out[1:s,8]),mean(out[1:s,9]),mean(out[1:s,10])))
+  row.names(hihc) = c("Mean","Standard Deviation","Average t-ratio","Rejection Rate")
+  nohc      = data.frame("H0"    = c(mean(out[index1,2]),sd(out[index1,2]),mean(out[index1,3]),mean(out[index1,4])),
+                         "HC1"   = c(mean(out[index1,5]),sd(out[index1,5]),mean(out[index1,6]),mean(out[index1,7])),
+                         "HCora" = c(mean(out[index1,8]),sd(out[index1,8]),mean(out[index1,9]),mean(out[index1,10])))
+  row.names(nohc) = c("Mean","Standard Deviation","Average t-ratio","Rejection Rate")
+  res       = list(beta=beta,hihc=hihc,nohc=nohc,out=out)
+  return(res)
+}
+
+set.seed(1111)
+iter   = 10000
+index1 = (iter+1):(2*iter)
+result = reptable(s = iter) # stargazar tables
+stargazer(result[[1]],title = "$\\hat{\\beta}$",header = F,summary = F)
+```
+
+## OLS estimator with HC covariance (continue)
+```{r,results='asis'}
+stargazer(result[[2]],title = "standard error of $\\hat{\\beta}$ (High Heteroskedasticity) ", header = F, summary = F)
+```
+
+## OLS estimator with HC covariance (continue)
+```{r, results="asis"}
+stargazer(result[[3]],title = " standard error of $\\hat{\\beta}$ (No Heteroskedasticity)", header = F, summary = F)
+```
+
+## OLS estimator with HC covariance (continue)
+```{r}
+temp   = result$out
+mydata = data.frame("Combination" = c(rep("Homo-conventional",iter),rep("Homo-HC1",iter),rep("Heter-conventional",iter), rep("Heter-HC1",iter)))
+mydata$t_ratio[which(mydata$Combination == "Homo-conventional")] = temp$H0_t[index1]
+mydata$t_ratio[which(mydata$Combination == "Homo-HC1")] = temp$HC1_t[index1]
+mydata$t_ratio[which(mydata$Combination == "Heter-conventional")] = temp$H0_t[1:iter]
+mydata$t_ratio[which(mydata$Combination == "Heter-HC1")] = temp$HC1_t[1:iter]
+
+ggplot(aes(x = t_ratio),data = mydata) +
+  geom_density() + 
+  facet_grid(Combination ~ .) + 
+  stat_function(fun = dt,args = list(df = 28), colour = "red")
+```
+
+## OLS estimator with HC covariance (continue)
+* When DGP is heteroskedastic, conventional vcov (the homoskedastic variance estimator) and HC1 gives a much higher rejection rate than it should be.  It biased up. (0.251 for conventional and 0.204 for HC1, which are higher than 0.05) Oracle HC1 gives a 0.035 rejection rate, which is close but still lower than 0.05. (Seen Table 2)
+
+* When DGP is homoskedastic, HC1 gives much higher rejection rate than it should be. It biased up. (0.170 for HC1 which is higher than 0.05). Conventional vcov basically gives the right rejection rate, which is close to 0.05. Oracle HC1 gives a rejection rate of 0.034, which is close but lower than 0.05. (Seen Table 3)
+
+## OLS estimator with HC covariance (continue)
+* Under heteroskedasticity, the bias seems to arise from a bad estimation of the standard error and also possibly from a bad approximation of the t-test distribution. Under heteroskedasticity, conventional vcov and HC1 are both not a good estimator of the variance, they underestimate the variance. Oracle HC1 is the real variance. However, the rejection rate of Oracle HC1 is not 5%, which could potentially be an indicator of a bad approximation of the t-test distribution.
+
+* Under homoskedasticity, the bias arises from a bad estiation of the standard error. HC1 underestimates the real variance and biased up the t-ratio. Also,  the rejection rate of Oracle HC1 is not super close to 5%, which could potentially be an indicator of a bad approximation of the t-test distribution.
+
+
+

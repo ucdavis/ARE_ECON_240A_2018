@@ -1,0 +1,108 @@
+---
+title: "Assignment III"
+author: "YEP"
+date: "2/1/2018"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+## Leverage plot
+As expected, observations with larger x have higher leverage:
+
+```{r }
+library(ggplot2)
+library(dplyr)
+library(sandwich)
+
+set.seed(102030)
+
+  x <-rchisq(100,df=1)
+  e <-rnorm(100)
+  y <- x^2+e
+  b <- lm(y~x, data=as.data.frame(cbind(x,e,y)))
+
+leverage <- hatvalues(b)
+data <- data.frame(cbind(x,y,leverage))
+
+ ggplot(aes(x=x, y=y, size=leverage),data=data) +
+   geom_point()
+```
+
+## OLS estimator with HC covariance
+```{r }
+dgp <- function(sig){
+   d <-c(rep(1,3),rep(0,27))
+  
+   sigmas <-c(rep(1, 3),rep(sig, 27))
+   e <-rnorm(30,mean = 0,sd = sigmas)
+   y <- e
+   reg <- lm(y~d, data=as.data.frame(cbind(y,d)))
+   conv <- cbind(sig,"conventional",t(summary(reg)$coef[2,]))
+   
+   HC1 <- vcovHC(reg, type = "HC1")[2,2]
+   HC1 <- cbind(sig,"HC1",conv[3],sqrt(HC1),0,0)
+   
+   uHC1 <- vcovHC(reg, omega= (30/28)*sigmas^2)[2,2]
+   uHC1 <- cbind(sig,"uHC1",conv[3],sqrt(uHC1),0,0)
+   
+   res <- data.frame(rbind(conv,HC1,uHC1))
+   
+   return(res)
+ }
+ 
+
+ S <- 10000
+ params_gr <-expand.grid(1:S, sig=c(0.5, 1))
+ res_gr <-mapply(dgp, sig=params_gr$sig, SIMPLIFY = FALSE) %>%
+   bind_rows()
+ res_gr$Std..Error <- as.numeric(res_gr$Std..Error)
+ res_gr$Estimate <- as.numeric(res_gr$Estimate)
+ res_gr$Pr...t.. <- as.numeric(res_gr$Pr...t..)
+ res_gr$tt<- res_gr$Estimate/res_gr$Std..Error 
+ res_gr$p_values <- pt(-abs(res_gr$tt),28)*2
+ 
+ 
+ res_gr %>% group_by(sig) %>% filter(V2== "conventional") %>% 
+   summarise(mean=mean(Estimate),sd=sd(Estimate),five=sum(Pr...t..<0.05)/S)
+ 
+ 
+ res_gr %>% group_by(sig,V2) %>% 
+   summarise(mean=mean(Std..Error,na.rm=T),sd=sd(Std..Error),five=sum(p_values<0.05)/S)
+ 
+ 
+```
+
+## OLS estimator with HC covariance
+With heteroskedasticity, rejection rates are much larger than 5%. The estimation of standard errors are below the unfeasible HC1, but HC1 is better than the conventional.
+Under homoskedasticity, the conventional behaves well, as expected.
+
+## OLS estimator with HC covariance
+```{r }
+tdist.conventional.ho <- res_gr %>% filter(V2== "conventional", sig==1) %>% select(tt)
+ tdist.conventional.he <- res_gr %>% filter(V2== "conventional", sig==0.5) %>% select(tt)
+ tdist.HC1.ho <- res_gr %>% filter(V2== "HC1", sig==1) %>% select(tt)
+ tdist.HC1.he <- res_gr %>% filter(V2== "HC1", sig==0.5) %>% select(tt)
+ 
+ 
+ ggplot(data.frame(x = c(-4, 4)), aes(x = x)) +
+   stat_function(fun = dt, args = list(df = 28),aes(colour = "True")) + 
+   geom_density(data=tdist.conventional.ho, aes(x=tt,colour = "Conventional")) + 
+   geom_density(data=tdist.HC1.ho, aes(x=tt,colour = "HC1")) + 
+   theme_bw() +
+   ggtitle("homoskedastic")
+```
+ 
+## OLS estimator with HC covariance
+ 
+```{r }
+ ggplot(data.frame(x = c(-4, 4)), aes(x = x)) +
+   stat_function(fun = dt, args = list(df = 28),aes(colour = "True")) + 
+   geom_density(data=tdist.conventional.he, aes(x=tt,colour = "Conventional")) + 
+   geom_density(data=tdist.HC1.he, aes(x=tt,colour = "HC1")) + 
+   theme_bw() +
+   ggtitle("heteroskedastic")
+
+```

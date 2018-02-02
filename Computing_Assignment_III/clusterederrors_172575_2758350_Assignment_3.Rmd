@@ -1,0 +1,219 @@
+---
+title: "Assignment 3"
+author: "Clustered Errors"
+output:
+  ioslides_presentation: 
+    widescreen: yes
+  slidy_presentation: default
+  beamer_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(knitr)
+library(sandwich)
+library(lmtest)
+library(tidyverse)
+library(stargazer)
+library(haven)
+```
+
+## x-y Plot with Leverage
+```{r xy_plot}
+# Make Chi-Squared Function Better
+my_rchisq <- function(num_draws, df = 1) {
+  sample <- rchisq(num_draws, df = df)
+  return(sample)
+}
+
+# Write Sampling Function
+dgp_sample <- function(num_obs, dist) {
+  # If distribution is either normal or uniform...
+  x <- dist(num_obs)
+  e <- rnorm(num_obs)
+  y = x^2 + e 
+  
+  return_matrix <- cbind(as.matrix(y),as.matrix(x))
+  colnames(return_matrix) <- c('y','x')
+  return(as.data.frame(return_matrix))
+}
+
+#Create Sample From 1 Draw of a Random Chi2 with n=100
+set.seed(12345)
+ps3_a <- dgp_sample(100, my_rchisq)
+reg_ps3_a <- lm(y ~ x, ps3_a)
+
+#Get Leverage Values
+leverage <- hatvalues(reg_ps3_a)
+leverage <- as.data.frame(leverage, col.names = names("leverage"))
+
+#Bind Data into one Dataframe
+ps3_a <- cbind(ps3_a, leverage)
+
+#Plot
+ggplot(ps3_a, aes(x = x, y = y, size = leverage)) + geom_point(color = 'dodgerblue4') + geom_smooth(method = 'lm',formula = y~x, se = FALSE, show.legend = FALSE, color = 'firebrick1')
+```
+
+# Simulating OLS Estimators
+
+## OLS Estimators Under Homoskedasticity
+```{r d_vector}
+# Initialize a D vector of all zeros...
+D <- integer(30)
+# Replace the first three entries with ones.
+for (i in 1:3) {
+  D[i] <- 1
+}
+```
+
+```{r errors}
+dgp <- function(D, a, seed = 1) {
+  # This function takes our D vector and an a value for the sigma^2 as arguments. It also takes a seed, with the default seed already being set to one.
+  set.seed(seed)
+  e <- integer(30)
+  # Initialize a vector of 30 zeros to contain the errors we are about to generate.
+  for (i in 1:30) {
+    # Loop over the 30 observations in the D and e vectors.
+    if (D[i] == 1) {
+      # If the ith entry of D is equal to one, do the following...
+      e[i] <- rnorm(1, 0, 1)
+      # Replace the ith entry of e with a random normal with sigma^2 = 1.
+    } else {
+      # If the ith entry of D is not equal to one, do the following...
+      e[i] <- rnorm(1, 0, a)
+      # Replace the ith entry of e with a random number with sigma^2 = a.
+    }
+  }
+  # Now we can calculate the y data from this set of errors (essentially just y = e).
+  y <- e
+  # Take the D, e, and y vectors and bind them together into a data.frame.
+  return_df <- as.data.frame(cbind(y, D, e))
+  # Then, return the data.frame.
+  return(return_df)
+}
+```
+
+```{r homoskedastic_estimation}
+# Initialize Data Frame for Estimates 
+sim_estimates_1 <- data.frame(beta = double(), se_hom = double(), t_hom = double(), p_hom = double(), se_het = double(), t_het = double(), p_het = double(), se_unf = double(), t_unf = double(), p_unf = double())
+
+# Create the sigma vectors to later calculate the unfeasible vcov matrix:
+sigmas_1 <- c(rep(1, 3), rep(1, 27))
+
+# Simulation Loop 1: 10,000 runs with Homoskedastic Errors
+for (i in 1:10000) {
+  # Generate data using dgp function (with sigma^2 = 1 and seed set to the iteration number).
+  data <- dgp(D, 1, i)
+  # Run Regression of y on D
+  reg <- lm(y ~ D, data)
+  # Generate unfeasible vcov matrix:
+  vcov_unfeas <- sandwich(reg, meat. = meatHC(reg, omega = sigmas_1))
+  # Store the first coefficient, error, t, and p in a vector (by pulling only the row "D" from the coeftest matrix).
+  coef <- coeftest(reg)["D", ]
+  # Estimate the second set of error, t, and p with vcovHC (heteroskedasticity), only pulling the 2nd, 3rd, and 4th column from "D" row.
+  coef <- append(coef, coeftest(reg, vcov = vcovHC)["D", 2:4])
+  # Estimate the last set of error, t, and p using the unfeasible matrix
+  coef <- append(coef, coeftest(reg, vcov = vcov_unfeas)["D", 2:4])
+  coef <- as.data.frame(t(coef))
+  colnames(coef) <- c("beta", "se_hom", "t_hom", "p_hom", "se_het", "t_het", "p_het", "se_unf", "t_unf", "p_unf")
+  sim_estimates_1 <- bind_rows(sim_estimates_1, coef)
+}
+```
+
+```{r summarizing_data}
+estimates_1_sum <- cbind(sim_estimates_1, (sim_estimates_1["p_hom"] <= 0.05), (sim_estimates_1["p_het"] <= 0.05), (sim_estimates_1["p_unf"] <= 0.05))
+colnames(estimates_1_sum)[11:13] <- c("p_hom_rej", "p_het_rej", "p_unf_rej") 
+```
+
+```{r create_table_1}
+row_1 <- summarize(estimates_1_sum, mean(beta), sd(beta))
+row_1 <- cbind(row_1, NaN)
+colnames(row_1) <- c("Mean", "S.D.", "Reject")
+row_2 <- summarize(estimates_1_sum, mean(se_hom), sd(se_hom), mean(p_hom_rej))
+colnames(row_2) <- c("Mean", "S.D.", "Reject")
+row_3 <- summarize(estimates_1_sum, mean(se_het), sd(se_het), mean(p_het_rej))
+colnames(row_3) <- c("Mean", "S.D.", "Reject")
+row_4 <- summarize(estimates_1_sum, mean(se_unf), sd(se_unf), mean(p_unf_rej))
+colnames(row_4) <- c("Mean", "S.D.", "Reject")
+table_1 <- bind_rows(row_1, row_2, row_3, row_4)
+rownames(table_1) <- c("Beta", "SE Conventional", "SE Heteroskedasticity", "SE Unfeasible")
+kable(table_1, digits = 3, caption = "Table 1: OLS Estimates Under Homoskedasticity")
+```
+
+Here we see that using heteroskedastic standard errors are only slightly larger and cause us to over-reject the null (comparing 0.102 to 0.044 and 0.053). In the figure, this is evident by the slightly fatter tails for the robust standard errors.
+
+## OLS Estimators Under Heteroskedasticity
+
+```{r heteroskedastic_estimation}
+# Initialize Data Frame for Estimates 
+sim_estimates_0.5 <- data.frame(beta = double(), se_hom = double(), t_hom = double(), p_hom = double(), se_het = double(), t_het = double(), p_het = double(), se_unf = double(), t_unf = double(), p_unf = double())
+
+# Create the sigma vectors to later calculate the unfeasible vcov matrix:
+sigmas_0.5 <- c(rep(0.5, 3), rep(1, 27))
+
+# Simulation Loop 1: 10,000 runs with Homoskedastic Errors
+for (i in 1:10000) {
+  # Generate data using dgp function (with sigma^2 = 1 and seed set to the iteration number).
+  data <- dgp(D, 0.5, i)
+  # Run Regression of y on D
+  reg <- lm(y ~ D, data)
+  # Generate unfeasible vcov matrix:
+  vcov_unfeas <- sandwich(reg, meat. = meatHC(reg, omega = sigmas_0.5))
+  # Store the first coefficient, error, t, and p in a vector (by pulling only the row "D" from the coeftest matrix).
+  coef <- coeftest(reg)["D", ]
+  # Estimate the second set of error, t, and p with vcovHC (heteroskedasticity), only pulling the 2nd, 3rd, and 4th column from "D" row.
+  coef <- append(coef, coeftest(reg, vcov = vcovHC)["D", 2:4])
+  # Estimate the last set of error, t, and p using the unfeasible matrix
+  coef <- append(coef, coeftest(reg, vcov = vcov_unfeas)["D", 2:4])
+  coef <- as.data.frame(t(coef))
+  colnames(coef) <- c("beta", "se_hom", "t_hom", "p_hom", "se_het", "t_het", "p_het", "se_unf", "t_unf", "p_unf")
+  sim_estimates_0.5 <- bind_rows(sim_estimates_0.5, coef)
+}
+```
+
+```{r summarizing_data_hetero}
+estimates_0.5_sum <- cbind(sim_estimates_0.5, (sim_estimates_0.5["p_hom"] <= 0.05), (sim_estimates_0.5["p_het"] <= 0.05), (sim_estimates_0.5["p_unf"] <= 0.05))
+colnames(estimates_0.5_sum)[11:13] <- c("p_hom_rej", "p_het_rej", "p_unf_rej") 
+```
+
+```{r creating_table_2}
+row_1 <- summarize(estimates_0.5_sum, mean(beta), sd(beta))
+row_1 <- cbind(row_1, NaN)
+colnames(row_1) <- c("Mean", "S.D.", "Reject")
+row_2 <- summarize(estimates_0.5_sum, mean(se_hom), sd(se_hom), mean(p_hom_rej))
+colnames(row_2) <- c("Mean", "S.D.", "Reject")
+row_3 <- summarize(estimates_0.5_sum, mean(se_het), sd(se_het), mean(p_het_rej))
+colnames(row_3) <- c("Mean", "S.D.", "Reject")
+row_4 <- summarize(estimates_0.5_sum, mean(se_unf), sd(se_unf), mean(p_unf_rej))
+colnames(row_4) <- c("Mean", "S.D.", "Reject")
+table_2 <- bind_rows(row_1, row_2, row_3, row_4)
+rownames(table_2) <- c("Beta", "SE Conventional", "SE Heteroskedasticity", "SE Unfeasible")
+kable(table_2, digits = 3, caption = "Table 2: OLS Estimates Under Heteroskedasticity")
+```
+
+Here we see that the conventional standard errors are much larger and cause us to severely over-reject the null. In the figure this is evident by the tails being much fatter than the distribution of the robust standard error. 
+
+# Figures
+
+## Homoskedasticity
+
+```{r figure_1}
+figure_1 <- qplot(, geom = "blank") + geom_density(aes(t_hom), data = estimates_1_sum, colour = "#E69F00", size = 1.25) + stat_function(fun=dt, args = 28, aes(stat="t_density"), size = 1.25) + geom_density(aes(t_het), data = estimates_1_sum, colour = "#0072B2", size = 1.25) + scale_x_continuous(limits=c(-4,4)) + ggtitle("Empirical distribution of t-ratios, homoskedastic dgp") + xlab("Blue - HC s.e.s; Orange - Conventional s.e.s") + ylab("Density")
+print(figure_1)
+```
+
+## Heteroskedasticity
+
+```{r figure_2}
+figure_2 <- qplot(, geom = "blank") + geom_density(aes(t_hom), data = estimates_0.5_sum, colour = "#56B4E9", size = 1.25) + stat_function(fun=dt, args = 28, aes(stat="t_density"), size = 1.25) + geom_density(aes(t_het), data = estimates_0.5_sum, colour = "#CC79A7", size = 1.25) + scale_x_continuous(limits=c(-4,4)) + ggtitle("Empirical distribution of t-ratios, heteroskedastic dgp") + xlab("Pink - HC s.e.s; Blue - Conventional s.e.s") + ylab("Density")
+print(figure_2)
+
+```
+
+
+
+## Conclusion
+
+We see that there is a very small bias when using heteroskedastic robust standard errors when the data is homoskedastic. However, we run into a serious problem when using conventional standard errors when the data is heteroskedastic as the bias will be very large. 
+
+Although controlling for heteroskedasticity significantly reduces the bias when heteroskadisticity is present, the estimates will still be biased _relative_ to correctly estimating standard errors under homoskedasticity. This is seen by comparing the difference between the mean heteroskedastic standard error in table 2 and the unfeasible one (0.179) to the difference between the mean homoskedastic standard error in table 1 to the unfeasbile one (0.005). 

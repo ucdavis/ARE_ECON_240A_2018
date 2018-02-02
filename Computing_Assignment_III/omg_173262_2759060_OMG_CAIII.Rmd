@@ -1,0 +1,167 @@
+---
+title: "CAIII"
+author: "OMG"
+date: "February 1, 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Exercise 1: Leverage Plot
+
+```{r cars, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(sandwich)
+library(lmtest)
+library(tidyverse)
+library(ggpubr)
+#Exercise 1
+simulator<-function(n,distrib){
+  set.seed(12345)
+  te=rnorm(n)
+  if (identical(distrib,"u")) {tx=runif(n) 
+  distr="uniform"}
+  if (identical(distrib,"n")) {tx=rnorm(n)
+  distr="normal"}
+  if (identical(distrib,"q")) {tx=rchisq(n,1) 
+  distr="chisq"}
+  
+  ty=(tx^2)+te
+  tsim=data.frame(ty,tx)
+  lmodel <- lm(ty~ tx, data = tsim)
+  leverage <- hatvalues(lmodel)
+  tsim <- data.frame(ty,tx,leverage)
+  summary(lmodel)
+  
+  sim_n1=c(coef(summary(lmodel))[1, 1], coef(summary(lmodel))[2, 1])
+  return(tsim)
+
+}
+#run the simulation of sample size of 100 once  
+tsim <- simulator(100,"q")
+#graph the scatter plot
+G1 <- ggplot(aes(x=tx, y=ty, size=leverage), data=tsim) + geom_point()
+#Leave out the observations with large leverage
+x_small <- tsim[(tsim[,"leverage"]<0.1),] 
+#graph again
+G2 <- ggplot(aes(x=tx, y=ty, size=leverage), data=x_small) + geom_point()
+plot(G1)
+```
+
+## Exercise 2
+
+**Replicated table**
+
+Comments on results of the oracle estimate:
+
+- We can see that for the heteroscedastic case the rejection rate with the oracle computation of the var-cov matrix is closer to 5%.
+- We use the same t distribution with 28 degrees of freedom, hence the error in the rejection rate of "constant" and "HC1" comes from the estimation of the var-cov matrix.
+- For the homoscedastic case, the best estimator is the "constant" methodology (asumming homoskedasticity)
+- However, doing oracle doesnt significantly affect the rejection rate.
+
+```{r pressure, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggpubr)
+
+simulate<-function(sig){
+#sample size
+n=30
+#generate error
+h_var=sig
+D=rep(0,n)
+D[1:3]=1
+b0=0
+b1=0
+e=rep(1,n)
+e[1:3]=rnorm(3)
+e[4:30]=sqrt(h_var)*rnorm(27)
+#or we could just do rnorm(27,0,h_var)?
+y=b0+b1*D+e
+tsim=data.frame(y, D)
+
+lmodel <- lm(y~ D, data = tsim)
+#homoscdedastic #I thought homo should be constant no?
+#I thought the default they are using in R is HC3
+#ct1 <- coeftest(lmodel,  vcov = vcovHC(lmodel,"const"))
+output1=coef(summary(lmodel))[2,]
+#add robust estimate of se
+output2=coeftest(lmodel, df = 28, vcov = vcovHC(lmodel, type = "HC1"))[2,]
+#input the true v-cov matrix of errors
+sigmas=c(rep(1,3), rep(sig,27))
+output3=coeftest(lmodel, df = 28, vcov = sandwich(lmodel,meat.=meatHC(lmodel,omega=sigmas)))[2,]
+output=data.frame(output1,output2,output3)
+reject=output[4,]<0.05 #I think we also need a rejection rate somewhere,I added something here
+output=rbind(output,reject)
+names(output)<-c("const", "HC1","unf")
+rownames(output)[5]<-"reject"
+return(output)
+
+}
+
+
+S <- 10000
+params_gr <- expand.grid(sim=1:S, sig=c(0.5, 1))
+expaned=data.frame(params_gr,freq=5)
+t=params_gr[rep(seq_len(nrow(params_gr)), each=5),]
+res_gr <- mapply(simulate, sig=params_gr$sig, SIMPLIFY = FALSE)%>%
+  bind_rows()
+var=rep(c("est","se", "t", "pi","reject"), 20000)
+complete=cbind(t,var,res_gr)
+
+
+#subetting example
+#sig == 0.5
+mc1 <- mean(complete$const[which(complete$var=="se" & complete$sig==0.5)])
+sc1 <- sd(complete$const[which(complete$var=="se" & complete$sig==0.5)])
+mh1 <- mean(complete$HC1[which(complete$var=="se" & complete$sig==0.5)])
+sh1 <- sd(complete$HC1[which(complete$var=="se" & complete$sig==0.5)])
+rc1 <- mean(complete$const[which(complete$var=="reject" & complete$sig==0.5)])
+rh1 <- mean(complete$HC1[which(complete$var=="reject" & complete$sig==0.5)])
+#sig == 1
+mc2 <- mean(complete$const[which(complete$var=="se" & complete$sig==1)])
+sc2 <- sd(complete$const[which(complete$var=="se" & complete$sig==1)])
+mh2 <- mean(complete$HC1[which(complete$var=="se" & complete$sig==1)])
+sh2 <- sd(complete$HC1[which(complete$var=="se" & complete$sig==1)])
+rc2 <- mean(complete$const[which(complete$var=="reject" & complete$sig==1)])
+rh2 <- mean(complete$HC1[which(complete$var=="reject" & complete$sig==1)])
+
+#sig==0.5 unf
+mc3 <- mean(complete$unf[which(complete$var=="se" & complete$sig==0.5)])
+sc3 <- sd(complete$unf[which(complete$var=="se" & complete$sig==0.5)])
+mh3 <- mean(complete$unf[which(complete$var=="se" & complete$sig==1)])
+sh3 <- sd(complete$unf[which(complete$var=="se" & complete$sig==1)])
+rc3 <- mean(complete$unf[which(complete$var=="reject" & complete$sig==0.5)])
+rh3 <- mean(complete$unf[which(complete$var=="reject" & complete$sig==1)])
+
+l1 <- c(mc1,sc1,rc1)
+l2 <- c(mh1,sh1,rh1)
+l3 <- c(mc2,sc2,rc2)
+l4 <- c(mh2,sh2,rh2)
+l5 <- c(mc3,sc3,rc3)
+l6 <- c(mh3,sh3,rh3)
+table<- rbind(l1,l2,l3,l4,l5,l6)
+
+table2<-rbind(l1,l2,l3,l4)
+
+rownames(table)=c("Ht err- hom est", "Ht err- HC1", "Hom err- hom est", "Hom err- HC1","Ht err-oracle","Hom err-oracle") 
+colnames(table)=c("mean", "sd", "r rate")
+
+homoconst <- complete$const[which(complete$var=="t", complete$sig==1)]
+homoHC <- complete$HC1[which(complete$var=="t", complete$sig==1)]
+heteroconst <- complete$const[which(complete$var=="t", complete$sig==0.5)]
+heteroHC <- complete$HC1[which(complete$var=="t", complete$sig==0.5)]
+graph <- data.frame(homoconst,homoHC,heteroconst,heteroHC)
+A <- ggplot(aes(x=homoconst), data=graph) +geom_density()+ stat_function(fun = dt, args = list(df = 28), colour = "red")
+B <- ggplot(aes(x=homoHC), data=graph) +geom_density()+ stat_function(fun = dt, args = list(df = 28), colour = "red")
+C <- ggplot(aes(x=heteroconst), data=graph) +geom_density()+ stat_function(fun = dt, args = list(df = 28), colour = "red")
+D <- ggplot(aes(x=heteroHC), data=graph) +geom_density()+ stat_function(fun = dt, args = list(df = 28), colour = "red")
+Final <- ggarrange(A,B,C,D + rremove("x.text"), labels = c("A", "B", "C", "D"),ncol = 2, nrow = 2)
+
+print(table)
+```
+## Combined plots for the t-ratio
+```{r, echo=FALSE}
+plot(Final)
+```
+

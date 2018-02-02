@@ -1,0 +1,153 @@
+---
+title: "Assignment 3"
+author: "USER"
+date: "January 29, 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+## x-y plot with leverage
+
+The scatterplot shows the relationship between x and y and size representing leverage of each point. It is clear that leverage increases for large x. There are only a few points with high leveage, but the magnitude of the leverage is very large.
+
+```{r leverage plot}
+## Leverage Plot ##
+library(ggplot2)
+rm(list=ls())
+
+set.seed(1234)
+x = rchisq(100,df=1)
+y = x^2 + rnorm(100)
+leverage = unname(hatvalues(lm(y~x)))
+
+plot.dat = data.frame(x,y,leverage)
+ggplot(aes(x=x, y=y, size=leverage), data=plot.dat) + 
+  geom_point(alpha=.3, shape=16, color="blue") +
+  ggtitle("Scatterplot demonstrating high leverage for large values of x")
+```
+
+
+## Means and Sds of Beta Hats
+<!-- Note: Simulation takes a couple of minutes to run for 250k replications --> 
+```{r HC Cov Sim}
+## Simulation ##
+library(sandwich)
+rm(list=ls())
+
+get.beta.sum = function (sigma.sq = NA){
+  r = .1 # Proportion of sample with unit error variance
+  n = 30  # Sample Size
+  D = c(rep(1, r*n), rep(0,n-r*n)) #x
+  e = c(rnorm(r*n,sd=1), rnorm(n-r*n, sd=sigma.sq))#It may exhibit different variances
+  y = e #Note that beta0=beta1=0
+  mod.fit = lm(y~D)
+  beta.coef = unname(mod.fit$coefficients[2]) # Beta Coefficient
+  se.beta.c =    unname(sqrt(diag(vcovHC(mod.fit, type="const")))[2]) # Constant VCOV
+  se.beta.hc1 =  unname(sqrt(diag(vcovHC(mod.fit, type="HC1")))[2]) # HC1 VCOV
+  se.beta.ohc1 = unname(sqrt(diag(vcovHC(mod.fit, omega = c(rep(1, r*n), rep(sigma.sq,n-r*n)))))[2]) # Oracle HC1 VCOC
+  se.beta = c(se.beta.c, se.beta.hc1, se.beta.ohc1)
+  t.val = beta.coef/se.beta # t-value, the true beta is zero
+  p.val = 2*pt(abs(t.val), df=n-2, lower.tail=F) # two-tailed p-value
+  out.df = data.frame(coef=beta.coef, se = se.beta, t.val=t.val, p.val=p.val)
+  row.names(out.df)=c("Const","HC1","Oracle")
+  return(out.df)
+}
+
+s = 25000 #simulation times
+set.seed(1234)
+results.list.homo = as.list(replicate(s, get.beta.sum(sigma.sq=1), simplify = F)) # Simulation results for sigma.sq=1
+results.list.hetero = as.list(replicate(s, get.beta.sum(sigma.sq=.5), simplify = F)) # Simulation results for sigma.sq=0.5
+
+sigma.names = c("homo","hetero")
+sim.names = paste("sim",1:s,sep="")
+var.names = c("Const","HC1","Oracle")
+stat.names = c("beta.coef","se.beta","t.val","p.val")
+results.array = array(NA,dim = c( # Restructure output into 4D array
+                                  2,  # dim 1: 2 different sigmas
+                                  s,  # dim 2: number of simulations
+                                  3,  # dim 3: 3 VCOVs
+                                  4), # dim 4: 4 Summary stats
+                 dimnames = list(sigma.names, sim.names, var.names, stat.names)
+                 )
+for (i in 1:s) results.array[1,i,,] = as.matrix(results.list.homo[[i]]) # Store homo data
+for (i in 1:s) results.array[2,i,,] = as.matrix(results.list.hetero[[i]]) #Store hetero data
+
+rm(results.list.homo, results.list.hetero) # remove unused data from memory
+```
+
+We simulate the model with 25,000 repetitions.
+
+```{r HC Cov Table 1}
+## Beta Hat table ##
+Beta.hat = round( cbind( Mean = apply(results.array[,,1,c("beta.coef")], 1, mean),
+                  SD = apply(results.array[,,1,c("beta.coef")], 1, sd)
+                  ), 3) # display means and sds in three digits
+Beta.hat
+```
+
+In both the homoskedastic and heteroskedastic cases, the estimate of beta is unbiased.
+
+
+## SEs of Beta Hats
+
+```{r HC Cov Table 2}
+## SEs tables ##
+SEs = list(Homo=NA, Hetero=NA)
+for (i in 1:2) {
+  SEs[[i]] = round( cbind( Mean = apply(results.array[i,,,c("se.beta")], 2, mean),
+                         SD = apply(results.array[i,,,c("se.beta")], 2, sd),
+                         reject.rate = apply(results.array[i,,,c("p.val")], 2, function(x) mean(x<.05))
+                         ), 3)  
+}
+SEs
+```
+
+Homoskedastic case (top panel):
+1. Conventional: unbiased, correct rejection rate
+2. HC1: downward biased, over-rejecting ()
+3. Oracle (theoretical): unbiased, under-rejecting (t vs. N(0,1))
+
+Conventiontal SE well approximates t distribution (next slide)
+
+Heteroskedasticity case (bottom panel):
+1. Conventional: downward biased, over-rejecting 
+2. HC1: slightly downward biased, over-rejecting
+3. Oracle (theoretical): unbiased, under-rejecting (t vs. N(0,1))
+
+Both are biased; t-distribution well approximated? Theoretically may not.
+
+## Plots of t-value distribution
+
+```{r HC Cov Plot}
+## Plots ##
+x = seq(-5, 5, length=100)
+hx = dt(x, df=28) # Theoretical student-t distribution
+
+par(mfrow=c(1,2))
+# Homoskedasticity
+plot(density(results.array["homo",,"Const",c("t.val")]), xlim=c(-5,5), ylim=c(0,.4), xlab="t", lwd=2,  # Const
+     main="Distribution of t-value:\n Homoskedasticity")
+lines(density(results.array["homo",,"HC1",c("t.val")]), col="blue", lwd=2) # HC1
+lines(x, hx, lwd=2, lty=2) # t-dist
+legend("topleft", legend = c("Const","HC1","t-dist"), col=c("black","blue","black"), lty=c(1,1,2), lwd=2, bty = "n")
+
+# Heteroskedasticity
+plot(density(results.array["hetero",,"Const",c("t.val")]), xlim=c(-5,5), ylim=c(0,.4), xlab="t", lwd=2, # Const
+     main="Distribution of t-value:\n Heteroskedasticity")
+lines(density(results.array["hetero",,"HC1",c("t.val")]), col="blue", lwd=2) # HC1
+lines(x, hx, lwd=2, lty=2) # t-dist
+legend("topleft", legend = c("Const","HC1","t-dist"), col=c("black","blue","black"), lty=c(1,1,2), lwd=2, bty = "n")
+```
+
+The left plot demonstrates that the over rejection is largely due to the under-estimation of variance of beta hat.
+
+
+
+## Summary
+- Unbiasedness of beta hat is not affected by the variances of the DGPs
+- Heteroskedasticity introduces bias in the SEs and wrong sizes
+- Heteroskedasticity-consistent variance estimators such as HC1 reduce bias of SEs with heteroskedastic data, but introduce bias in homoskedastic data
+- Under heteroskedasticity, unclear whether distribution of conventional t-test statistic is approximately a t distribution
