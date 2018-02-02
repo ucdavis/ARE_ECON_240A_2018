@@ -1,0 +1,211 @@
+Homework 3
+========================================================
+author: Fledgling RUCers
+date: 
+autosize: true
+
+##x-y plot with leverage
+========================================================
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(sandwich)
+```
+
+```{r}
+set.seed(5)
+simulation=function(f,n,df,ncp){
+  x=f(n,df,ncp)
+  e=rnorm(n)
+  y=x^2+e
+  CEF=cbind(y,x,e)
+  betahat=lm(y~x,data=as.data.frame(CEF))
+  return(betahat)
+}
+betahat=simulation(rchisq,100,1,0)
+ggplot(data=betahat)+
+  geom_point(aes(x=betahat$model$x,y=betahat$model$y,size=hatvalues(betahat)))+
+  geom_path(aes(x=betahat$model$x,y=betahat$fitted.values))+
+  labs(x="x",y="y")
+```
+
+========================================================
+
+```{r,include= FALSE}
+set.seed(6)
+random=function(n,d){
+  res=rnorm(n,sd=d)
+  return(res)
+}
+obs=function(d){
+  D=c(rep(1,3),rep(0,27))
+  e=c(random(3,1),random(27,d))
+  y=e
+  return(as.data.frame(cbind(y,D,e)))
+}
+
+simulation=function(s,sigma){
+  beta1=c(0)
+  ste=c(0)
+  tratio=c(0)
+  pvalue=0
+  Treject=0
+  Nreject=0
+  
+  stehetero1=c(0)
+  thetero1=c(0)
+  phetero1=0
+  Treject1=0
+  Nreject1=0
+  
+  
+  thetero2=0
+  phetero2=0
+  Omega=diag(x=c(rep(1,3),rep(sigma^2,27)))
+  X=as.matrix(cbind(rep(1,30),c(rep(1,3),rep(0,27))))
+  bread=solve(t(X)%*%X)%*%t(X)
+  hetero2=bread%*%Omega%*%t(bread)
+  stehetero2=(sum(diag(Omega)))^0.5/28
+    
+  for(t in 1:s){
+    observations=obs(sigma)
+    c=lm(y~D,data=observations)
+    sum=summary(c)
+    #homo
+    beta1=c(beta1,sum$coefficients[2,1])
+    ste=c(ste,(sum((c$residuals)^2)/28)^0.5)
+    tratio=c(tratio,sum$coefficients[2,3])
+    pvalue=pvalue+sum$coefficients[2,4]
+    if(abs(sum$coefficients[2,3])>2.048407){
+      Treject=Treject+1
+    }
+    if(abs(sum$coefficients[2,3])>1.959964){
+      Nreject=Nreject+1
+    }
+    #hetero1
+    hetero1=vcovHC(c, type="HC1")
+    Omega2=meatHC(c,type="HC1")
+    stehetero1=c(stehetero1,(sum(diag(Omega2)))^0.5/28)
+    thetero1=c(thetero1,sum$coefficient[2,1]/(hetero1[2,2]^0.5))
+    phetero1=2*pt(q=abs(sum$coefficient[2,1]/(hetero1[2,2]^0.5)),df=28,lower.tail=FALSE)+phetero1
+    if(abs(sum$coefficient[2,1]/(hetero1[2,2]^0.5))>2.048407){
+      Treject1=Treject1+1
+    }
+    if(abs(sum$coefficient[2,1]/(hetero1[2,2]^0.5))>1.959964){
+      Nreject1=Nreject1+1
+    }
+    #hetero2
+    thetero2=sum$coefficient[2,1]/(hetero2[2,2]^0.5)+thetero2
+    phetero2=2*pt(q=abs(sum$coefficient[2,1]/(hetero2[2,2]^0.5)),df=28,lower.tail=FALSE)+phetero2
+  }
+  beta1value=mean(beta1)
+  beta1std=sd(beta1)
+  stevalue=mean(ste)
+  stestd=sd(ste)
+  t=mean(tratio)
+  pvalue=pvalue/s
+  Treject=Treject/s
+  Nreject=Nreject/s
+  homo=cbind(beta1value,beta1std,stevalue,stestd,t,pvalue,Treject,Nreject)
+  
+  stehetero1value=mean(stehetero1)
+  stehetero1sd=sd(stehetero1)  
+  th1=mean(thetero1)
+  phetero1=phetero1/s
+  Treject1=Treject1/s
+  Nreject1=Nreject1/s
+  hetero1=cbind(beta1value,beta1std,stehetero1value,stehetero1sd,th1,phetero1,Treject1,Nreject1)
+
+  thetero2=thetero2/s
+  phetero2=phetero2/s
+  hetero2=cbind(beta1value,beta1std,stehetero2,0,thetero2,phetero2,0,0)
+  
+  res=rbind(homo,hetero1,hetero2)
+  rownames(res)=c("homo","hetero","TRUE")
+  ret=list(data=res,tratio,thetero1)
+  return(ret)
+}
+```
+
+## Monte-Carlo Simulations
+$\sigma=1$ 
+```{r}
+#sigma=1
+s=10000:10000
+d=rep(1,1)
+b1=mapply(simulation,s,d,SIMPLIFY = FALSE)
+a=b1[[1]]$data
+a[,c(1,3,5,6)]
+```
+
+$\sigma=0.5$
+```{r}
+#sigma=0.5
+s=10000:10000
+d=rep(0.5,1)
+b2=mapply(simulation,s,d,SIMPLIFY = FALSE)
+b=b2[[1]]$data
+b[,c(1,3,5,6)]
+```
+
+========================================================
+
+##table
+coefficient
+```{r}
+table1=rbind(b[1,1:2],a[1,1:2])
+rownames(table1)=c("heteroskedasticity","homoskedasticity")
+table1
+```
+
+standard error
+```{r}
+table2=rbind(b[1,c(3,4,8,7)],b[2,c(3,4,8,7)],a[1,c(3,4,8,7)],a[2,c(3,4,8,7)])
+rownames(table2)=c("heteroskedasticity conventional","heteroskedasticity HC1", "homoskedasticity conventional","homoskedasticity HC1")
+table2
+```
+
+========================================================
+
+##density plot
+```{r}
+thoc=b1[[1]][[2]]
+thoc=as.data.frame(thoc[2:10001])
+p1=ggplot(data=thoc)+
+  geom_density(aes(x=thoc[,1]))+
+  stat_function(fun=dt,args = list(df = 28))+
+  labs(x="homoskedastic, t-ratio obtained with conventional vcov")
+```
+
+```{r}
+thoh=b1[[1]][[3]]
+thoh=as.data.frame(thoh[2:10001])
+p2=ggplot(data=thoh)+
+  geom_density(aes(x=thoh[,1]))+
+  stat_function(fun=dt,args = list(df = 28))+
+  labs(x="homoskedastic, t-ratio obtained with HC1")
+```
+
+```{r}
+thec=b2[[1]][[2]]
+thec=as.data.frame(thec[2:10001])
+p3=ggplot(data=thec)+
+  geom_density(aes(x=thec[,1]))+
+  stat_function(fun=dt,args = list(df = 28))+
+  labs(x="heteroskedastic, t-ratio obtained with conventional vcov")
+```
+
+```{r}
+theh=b2[[1]][[3]]
+theh=as.data.frame(theh[2:10001])
+p4=ggplot(data=theh)+
+  geom_density(aes(x=theh[,1]))+
+  stat_function(fun=dt,args = list(df = 28))+
+  labs(x="heteroskedastic, t-ratio obtained with HC1")
+```
+
+```{r}
+source("http://peterhaschke.com/Code/multiplot.R")
+multiplot(p1, p2, p3, p4, cols=2)
+```
