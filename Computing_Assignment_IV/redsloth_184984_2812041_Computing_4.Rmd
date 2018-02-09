@@ -1,0 +1,222 @@
+---
+title: "Computing 4"
+author: "Hoppenfeld"
+date: "2/8/2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+
+```
+
+#OLS Estimator is Consistent
+
+```{r echo = FALSE}
+# consistency of beta
+f <- function(n) {
+n <- n
+b <- 4
+
+x <- runif(n,0,100)
+e <- rnorm(n,0,1)
+
+y <- b*x + e
+
+bhat <- coef(lm(y~x))[2]
+bdiff <- bhat - b
+
+return(bdiff)
+}
+
+g <- function(n) {
+  v <- c(NULL)
+  for (i in c(1:n)) {
+    v <- c(v, f(i))
+  }
+  return (v)
+}
+
+N <- 200
+n <- c(1:N)
+
+ggplot() + geom_line(aes(n[-1],g(N)[-1]))
+
+```
+
+
+#OLS Estimator Converges to Normal
+
+```{r echo = FALSE}
+# convergence in distribution
+
+f <- function(n) {
+  n <- n
+  b <- 4
+  
+  bhat <- c()
+  for (i in c(1:10)) {
+  x <- runif(n,0,100)
+  e <- rnorm(n,0,1000)
+  y <- b*x + e
+  
+  bhat <- c(bhat, coef(lm(y~x))[2])
+  }
+  return(bhat)
+}
+
+ggplot() + geom_density(aes(f(100))) + geom_density(aes(f(1000))) + geom_density(aes(f(10000))) + geom_density(aes(f(100000)))
+```
+$\hat{\beta} \stackrel{A}{\sim} N(\beta, \frac{V_\beta}{n}) \text{ , but note that } n \to 0 \implies \hat{\beta} \stackrel{A}{\sim} N(\beta, 0) = \beta \text{ , a constant}.$
+
+# Augustin-Louis Cauchy
+
+```{r  include = FALSE, cache=FALSE}
+rm(list=ls())
+#library(broom)
+#library(dplyr)
+#library(magrittr)
+
+
+set.seed(123)
+
+n=100000
+
+
+x <- rnorm(n)
+
+en <- rnorm(n)
+ec <- rcauchy(n)
+
+
+yn <- 0.8 + 0.3*x + en
+yc <- 0.8 +0.3*x + ec
+
+simulation <- data.frame(x,yn,yc,en,ec)
+
+
+#simulations
+
+  cauchy_001 <- cbind()
+  cauchy_01 <- cbind()
+  cauchy_1 <- cbind()
+  cauchy_10 <- cbind()
+  cauchy_100 <- cbind()
+
+  normal_001 <- cbind()
+  normal_01 <- cbind()
+  normal_1 <- cbind()
+  normal_10 <- cbind()
+  normal_100 <- cbind()
+  
+  constant <- cbind()
+
+  
+  for (i in seq(1000)){
+
+    
+      simulation$random_order <- order(runif(n= n))
+
+   reg <- lm(simulation$yc ~ simulation$x, subset = simulation$random_order <= 10)
+  result <- coef(reg)[2]
+  cauchy_001 <- rbind(cauchy_001 , result)
+
+  reg <- lm(simulation$yc ~ simulation$x, subset = simulation$random_order <= 100)
+  result <- coef(reg)[2]
+  cauchy_01 <- rbind(cauchy_01 , result)
+  
+  reg <- lm(simulation$yc ~ simulation$x, subset = simulation$random_order <= 1000)
+  result <- coef(reg)[2]
+  cauchy_1 <- rbind(cauchy_1 , result)
+  
+  reg <- lm(simulation$yc ~ simulation$x, subset = simulation$random_order <= 10000)
+  result <- coef(reg)[2]
+  cauchy_10 <- rbind(cauchy_10 , result)
+  
+
+  
+   reg <- lm(simulation$yn ~ simulation$x, subset = simulation$random_order <= 10)
+  result <- coef(reg)[2]
+  normal_001 <- rbind(normal_001 , result)
+
+  reg <- lm(simulation$yn ~ simulation$x, subset = simulation$random_order <= 100)
+  result <- coef(reg)[2]
+  normal_01 <- rbind(normal_01 , result)
+  
+  reg <- lm(simulation$yn ~ simulation$x, subset = simulation$random_order <= 1000)
+  result <- coef(reg)[2]
+  normal_1 <- rbind(normal_1 , result)
+  
+  reg <- lm(simulation$yn ~ simulation$x, subset = simulation$random_order <= 10000)
+  result <- coef(reg)[2]
+  normal_10 <- rbind(normal_10 , result)
+  
+
+  constant <- rbind(constant, 1)
+ 
+  
+
+}
+  colnames(cauchy_001) <- "cauchy_001"
+  colnames(cauchy_01) <- "cauchy_01"
+  colnames(cauchy_1) <- "cauchy_1"
+  colnames(cauchy_10) <- "cauchy_10"
+
+  colnames(normal_001) <- "normal_001"
+  colnames(normal_01) <- "normal_01"
+  colnames(normal_1) <- "normal_1"
+  colnames(normal_10) <- "normal_10"
+
+   colnames(constant)  <- "constant"
+  
+results <- data.frame(cauchy_001, cauchy_01, cauchy_1, cauchy_10, normal_001, normal_01, normal_1, normal_10,  constant)
+result_mean <- aggregate(results, FUN = mean, by = list(results$constant))
+result_sd <- aggregate(results, FUN = sd, by = list(results$constant))
+
+stats <- rbind(result_mean, result_sd)
+```
+
+```{r  include=  FALSE, cache=TRUE}
+
+#Alternate approach
+cauchy_alt <- cbind()
+normal_alt <- cbind()
+number <- cbind()
+
+for (i in seq(1000)){
+  
+  reg <- lm(simulation$yc ~ simulation$x, subset = simulation$random_order <= i)
+  cauchy_alt <- rbind(cauchy_alt,coef(reg)[2])
+  
+  reg <- lm(simulation$yn ~ simulation$x, subset = simulation$random_order <= i)
+  normal_alt <- rbind(normal_alt,coef(reg)[2])
+  
+  number <-rbind(number, i)
+  
+  alt_results <- data.frame(cauchy_alt, normal_alt, number)
+}
+```
+#Cauchy
+```{r echo=FALSE, warning = FALSE}
+ggplot()+ geom_line(aes(number, cauchy_alt )) + geom_hline(aes(yintercept = cauchy_alt[i])) + xlab("Sample Size") +ylab("Beta Hat (cauchy)")
+```
+
+
+#Normal
+```{r echo=FALSE, warning = FALSE}
+ggplot()+ geom_line(aes(number, normal_alt )) + geom_hline(aes(yintercept = normal_alt[i])) + xlab("Sample Size") +ylab("Beta Hat (normal)")
+```
+
+#Results Table
+
+```{r results = "asis", echo=FALSE}
+
+
+library(knitr)
+library(kableExtra)
+kable(stats,format="html", caption="Average point estimates of slope and intercept") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+

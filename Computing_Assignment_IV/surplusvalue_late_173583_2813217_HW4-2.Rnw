@@ -1,0 +1,254 @@
+\documentclass[11pt]{beamer}
+\usetheme{Warsaw}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{parskip}
+\usepackage{tikz}
+\usepackage[export]{adjustbox}
+\author{Surplus Value}
+\title{240A Computing Assignment IV}
+%\setbeamercovered{transparent} 
+%\setbeamertemplate{navigation symbols}{} 
+%\logo{} 
+\institute{University of California Davis} 
+\date{February 9th, 2018} 
+%\subject{} 
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+\SweaveOpts{echo=FALSE}
+
+
+\begin{frame}
+\titlepage
+\end{frame}
+\pagebreak
+
+\begin{figure}[htp] \centering{
+\includegraphics[width=200pt, max width=\textwidth]{condis.png}}
+\caption{Convergence in probability of the OLS estimator.}
+\end{figure}
+
+\section*{Explaining to your students}
+
+\begin{enumerate}
+
+\item As the sample size becomes larger, the probability of the estimator to differ from the true value by any finite amount tends to zero. 
+\item The larger the sample size, the narrower and taller the probability density function of the estimator.
+
+\item As $n$ tends to infinity, the pdf will collapse to the true value 
+
+\end{enumerate}
+\pagebreak
+\pagebreak
+
+\begin{figure}[htp] \centering{
+\includegraphics[width=200pt, max width=\textwidth]{convergenceindistr.png}}
+\caption{Convergence in distribution of the OLS estimator.}
+\end{figure}
+
+Given that the observations are drawn independently and from a distribution with finite sample and variance, the distribution of the estimator will converge to a normal distribution.
+
+
+
+\pagebreak
+
+
+
+<<>>=
+
+library(lmtest)
+library(ggplot2)
+set.seed(10101)
+sample=10
+#sample=100000
+
+
+
+BetaConvergence <- matrix(1, ncol=4, nrow = sample )
+
+for(i in 1:sample){
+X1 <- rnorm(1, 0, 1)
+X10 <- rnorm(10, 0, 1)
+X25 <- rnorm(25, 0, 1)
+X100 <- rnorm(100, 0, 1)
+
+e1 <- rnorm(1, 0, 1)
+e10 <- rnorm(10, 0, 1)
+e25 <- rnorm(25, 0, 1)
+e100 <- rnorm(100, 0, 1)
+
+y1=  0*X1 + e1
+y10= 0*X10 + e10
+y25= 0*X25 + e25
+y100= 0*X100 + e100
+
+  
+simN1 <- data.frame(cbind(X1,y1))
+simN10 <- data.frame(cbind(X10,y10))
+simN25 <- data.frame(cbind(X25,y25))
+simN100 <- data.frame(cbind(X100,y100))
+
+
+Reg1 <- lm(y1 ~ X1, simN1)
+Reg10 <- lm(y10 ~ X10, simN10)
+Reg25 <- lm(y25 ~ X25, simN25)
+Reg100 <- lm(y100 ~ X100, simN100)
+
+
+BetaConvergence[i,1] <- coeftest(Reg1)[1,1]
+BetaConvergence[i,2] <- coeftest(Reg10)[2,1]
+BetaConvergence[i,3] <- coeftest(Reg25)[2,1]
+BetaConvergence[i,4] <- coeftest(Reg100)[2,1]
+}
+
+dat1 <- data.frame(dens = c(BetaConvergence[,1],BetaConvergence[,2],BetaConvergence[,3],BetaConvergence[,4])
+                   , lines = rep(c("n=1","n=10","n=25","n=100"), each = sample))
+
+ggplot(dat1, aes(x = dens, fill = lines)) + geom_density(alpha = 0.5)
+
+@
+
+
+
+<<>>=
+
+library(ggplot2)
+library(lmtest)
+set.seed(10101)
+
+
+sample=10
+#sample=10000
+
+BetaConvergence <- matrix(1, ncol=3, nrow = sample )
+
+
+for(i in 1:sample){
+  X1 <- runif(1, 0, 1)
+  
+  X25 <- runif(25, 0, 1)
+  X100 <- runif(100, 0, 1)
+  e1 <- runif(1, -0.5,.5)
+  
+  e25 <- runif(25,  -0.5,.5)
+  e100 <- runif(100, -0.5,.5)
+  
+  y1= 0*X1 +e1
+  
+  y25= 0*X25 +e25
+  y100= 0*X100 +e100
+  
+  
+  simN1 <- data.frame(cbind(X1,y1))
+ 
+  simN25 <- data.frame(cbind(X25,y25))
+  simN100 <- data.frame(cbind(X100,y100))
+  
+  
+  
+  Reg1 <- lm(y1 ~ X1, simN1)
+  
+  Reg25 <- lm(y25 ~ X25, simN25)
+  Reg100 <- lm(y100 ~ X100, simN100)
+  
+  
+  
+  BetaConvergence[i,1] <- coeftest(Reg1)[1,1]
+  
+  BetaConvergence[i,2] <- coeftest(Reg25)[2,1]
+  BetaConvergence[i,3] <- coeftest(Reg100)[2,1]
+}
+
+
+dat1 <- data.frame(dens = c(BetaConvergence[,1],BetaConvergence[,2],BetaConvergence[,3])
+                   , lines = rep(c("n=1","n=25", "n=100"), each = sample))
+ggplot(dat1, aes(x = dens, fill = lines)) + geom_density(alpha = 0.5)
+@
+
+
+\section*{Augustin-Louis Cauchy}
+
+
+
+<<>>=
+library(ggplot2)
+library(lmtest)
+set.seed(09171988)
+X <- rnorm(10000, 0, 1)
+eN <- rnorm(10000, 0,1)
+eC <- rcauchy(10000, 0, 1)
+YN <- rep(.8,10000) + .3*X + eN
+# This would also work: YN <- .8 + .3*X + eN
+YC <- rep(.8,10000) + .3*X + eC
+dist <- rep(c("normal", "cauchy"), c(10000, 10000))
+
+a <- data.frame(cbind(X, "Y" = YN))
+b <- data.frame(cbind(X, "Y" = YC))
+dat <- cbind(rbind(a,b),dist)
+
+
+regress <- function(n=n, x=x){
+  
+if (x == 1) {
+  dat1 <- dat[which(dat$dist == "normal"),]
+}
+  else if (x==2) {
+  dat1 <- dat[which(dat$dist == "cauchy"),]
+
+}
+
+  dat2 <- dat1[c(1:n),]
+  reg <- lm(Y ~ X, dat2)
+  
+  return(coef(summary(reg))[2,c(1,2)])
+  
+}
+
+v <- c(500,1000,1500,2000,2500,3000,3500,4000,4500,5000,5500,6000,6500,7000,7500,8000,8500,9000,9500,10000)
+cauch1 <- data.frame(t(mapply(regress,v,2)),"distribution" = rep(c("cauchy"),20),"n"=rep(v) )
+norm1 <- data.frame(t(mapply(regress,v,1)),"distribution" = rep(c("normal"),20),"n"=rep(v) )
+
+#Final <- cbind(rbind(cauch1,norm1),"distribution" = rep(c("normal", "cauchy"), c(20, 20))
+               
+               #, "n" = rep(v,2))
+
+ggplot(cauch1, aes(n, Estimate))+geom_line() + geom_hline(yintercept =  mean(cauch1[,1]))
+ggplot(norm1, aes(n, Estimate))+geom_line() + geom_hline(yintercept =  mean(norm1[,1]))
+@
+
+
+\begin{itemize}
+
+
+\item Errors are drawn from a Cauchy distribution:
+
+\begin{figure}[htp] \centering{
+\includegraphics[width=200pt, max width=\textwidth]{cauchy.png}}
+\caption{Biasedness and non-convergence of the estimator when errors are drawn from a Cauchy distribution.}
+\end{figure}
+
+\pagebreak
+
+\item Errors are drawn from a normal distribution:
+
+\begin{figure}[htp] \centering{
+\includegraphics[width=200pt, max width=\textwidth]{Normal.png}}
+\caption{Unbiasedness and convergence of the estimator when errors are drawn from a normal distribution.}
+\end{figure}
+
+\pagebreak
+
+\begin{figure}[htp] \centering{
+\includegraphics[width=200pt, max width=\textwidth]{both.png}}
+\caption{Comparison between Cauchy and Normal distributions.}
+\end{figure}
+
+
+\end{itemize}
+
+
+\end{document}

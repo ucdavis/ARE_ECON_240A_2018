@@ -1,0 +1,97 @@
+---
+title: "ARE240 Assignment4"
+author: "Fledgling RUCers"
+date: "2018/2/8"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(broom)
+library(lmtest)
+library(sandwich)
+library(zoo)
+
+set.seed(2018)
+
+#y=50+100x+e,x~chisq(100),e~chisq(100)
+simu1 <- function(n) {
+  sigmas <- c(rep(1, n))
+  df <- data_frame(x =rchisq(n=n, df=10),
+                     err =rchisq(n=n,df=100) ,
+                     Y = 50+100*x+err)
+  reg <- lm(Y~x, data=df)
+  beta=tidy(reg)%>%
+    filter(term=="x")%>%
+    select(estimate)
+  return(beta)
+}
+s1=3:10000
+s1=seq(3, 1000, length.out = 30)
+
+res_gr <- mapply(simu1, n=s1, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+
+ggplot()+
+  geom_line(aes(x=s1,y=res_gr))+
+  geom_hline(aes(yintercept=100))+
+  xlim(1,10000)+
+  ylim(97,103)
+```
+
+
+```{r}
+
+s2=c(10,100,1000)
+num=expand.grid(rep(1000,1000),s2)
+reg <- mapply(simu1, n=num$Var2, SIMPLIFY = FALSE) %>%
+  bind_rows()%>%
+  mutate(n=num$Var2)
+reg$estimate=sqrt(num$Var2)*(reg$estimate-100)
+
+ggplot(aes(x=estimate, fill=n), data=reg) +
+  geom_density()+
+  facet_grid(n ~ .)+
+  stat_function(fun = dnorm, colour = "blue", args=list(mean=0,sd=sqrt(10)))
+```
+
+
+```{r}
+#2
+x =rnorm(100)
+simu <- function(f) {
+  df <- data_frame(err =f(100) ,
+                   Y = 0.8+0.3*x+err)
+  reg <- lm(Y~x, data=df)
+  beta=tidy(reg)%>%
+    filter(term=="x")%>%
+    select(estimate,std.error)
+  return(beta)
+}
+
+#normal
+s=rep(3:10000,3:10000)
+s=seq(3, 1000, length.out = 30)
+f=expand.grid(s,c(rnorm,rcauchy)) 
+res_gr <- mapply(simu,f$Var2, SIMPLIFY = FALSE) %>%
+  bind_rows()
+f=expand.grid(s,c("rnorm","rcauchy")) 
+res_gr=mutate(res_gr,n=f$Var1,error=f$Var2)
+stats_coef <- res_gr %>%
+  group_by(n,error) %>%
+  summarise(mean=mean(estimate),sd=sd(estimate))
+
+filter(stats_coef,n=="10"|n=="100"|n=="1000"|n=="5000"|n=="10000")
+```
+
+```{r}
+ggplot(data=stats_coef)+
+  geom_point(aes(x=n,y=mean))+
+  geom_hline(aes(yintercept=0.3))+
+  facet_grid(error ~ .)
+```

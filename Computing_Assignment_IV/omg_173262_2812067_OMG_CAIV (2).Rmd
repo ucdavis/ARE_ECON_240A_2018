@@ -1,0 +1,166 @@
+---
+title: "Computing Assignment IV"
+author: "OMG" 
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Problem 1
+DGP: x is rchisq(10000000, df=30), e is runif(10000000, -10,10), y=1+3*X+ e
+
+We ran 10,000 simulations for each sample size:
+
+
+|  size| mean coef| sd coef|
+|-----:|---------:|-------:|
+|    10|     2.994|   0.295|
+|   100|     3.003|   0.077|
+| 10000|     3.000|   0.007|
+
+```{r include=FALSE}
+library(tidyverse)
+library(broom)
+library(stargazer)
+library(knitr)
+
+#estimate beta of the linear projection model
+X <-  X <- rchisq(10000000, df=30)
+e_unif <- runif(10000000, -10,10)
+y <- 1+3*X+ e_unif
+df <- data_frame(X,y)
+reg <- lm(y~X,data=df) 
+beta_lm <- summary(reg)$coefficients[2, 1]
+
+XM <- as.matrix(X)
+aveXX <- (t(XM)%*%XM)/10000000
+
+#Create the dataframe
+runreg<-function(simul, n){
+  X <- rchisq(n, df=30)
+  e_unif <- runif(n, -10,10)
+  y <-  1+3*X+ e_unif
+  
+  Xe <- X*e_unif
+  XX <- X*X
+  df <- data_frame(X,y,Xe,XX)
+  aveXe <- sum(df$Xe)/n
+  aveXX <- sum(df$XX)/n
+  distXe <-sum(df$Xe)/sqrt(n)
+  valueX <- aveXe/aveXX
+  distX <- distXe/aveXX
+  
+  reg <- lm(y~X,data=df) 
+  coef <- summary(reg)$coefficients[2, 1]
+  se <- summary(reg)$coefficients[2, 2]
+  squared_e<- (deviance(reg)/df.residual(reg))
+  t_norm<-(coef-beta_lm)/se
+  
+  df_out <- data.frame(simul=simul,size=n, coef=coef,se=se,squared_e=squared_e, tnorm=t_norm, aveXX=aveXX, valueX=valueX, distX=distX)
+  
+  return(df_out)
+}
+
+
+S <- 1000
+params_gr <- expand.grid(1:S, size=c(10, 100,10000))
+res_gr <- mapply(runreg, simul=1:S ,n=params_gr$size, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+
+
+
+#table
+
+stats_coef <- res_gr %>%
+  group_by(size) %>%
+  summarise(mean_coef=mean(coef), sd_coef=sd(coef))
+kable(stats_coef, digits = 3, caption = "Table 1: OLS Estimates")
+
+#graph
+#data for graph
+```
+
+## Results:
+
+```{r}
+#distribution of beta
+ggplot(aes(x=coef), data=res_gr) +geom_density()+labs(x="beta",y="Density",title="Distribution of Beta")+facet_grid(size~.) 
+
+#distribution of t
+#ggplot(aes(x=tnorm), data=res_gr) +geom_density()+ stat_function(fun = dnorm, colour = "red")+labs(x="t",y="Density",title="Distribution of t")+facet_grid(size~.) 
+```
+
+## Results:
+
+```{r}
+#distribution of "aveXe/aveXX"
+ggplot(aes(x=valueX), data=res_gr)+geom_density()+labs(x="Bias",y="Density",title="Bias in Beta")+facet_grid(.~size)
+```
+
+## Results:
+
+```{r}
+#distribution of distXe
+ggplot(aes(x=distX), data=res_gr)+geom_density()+ stat_function(fun = dnorm, args = list(mean = mean(res_gr$valueX), sd = sqrt((100/3)/aveXX)), colour = "red")+labs(x="sqrt(n)*Bias",y="Density",title="sqrt(n) * Bias in Beta")+facet_grid(size~.)
+```
+
+
+
+```{r include=FALSE}
+
+#Create the dataframe
+set.seed(12345)
+X <- rnorm(10000)
+dis <- c(rep("norm",10000),rep("cauchy",10000))
+y <- ifelse(dis=="norm",0.8+0.3*X+rnorm(10000),0.8+0.3*X+rcauchy(10000))
+X <- rep(X,2)
+df <- data.frame(X,y,dis)
+
+#Create the function
+OLS <- function(n,d){
+  s1 <- filter(df,dis==d)   
+  sample <- head(s1,n)  
+  reg <- lm(y~X,data=sample) 
+  coef <- coef(reg) %>% tidy %>%
+  filter(names=="X") %>%
+  mutate(n=n,dis=d)
+  return(coef)
+}
+
+#grid 
+
+S <- 10000
+params_gr <- expand.grid(5:S, dis=c("norm", "cauchy"))
+res_gr <- mapply(OLS, n=5:S, d=params_gr$dis, SIMPLIFY = FALSE) %>%
+bind_rows() %>%
+as_data_frame()
+
+#table
+
+stats_coef <- res_gr %>%
+  group_by(dis) %>%
+  summarise(mean=mean(x,na.rm=TRUE),
+  sd=sd(x,na.rm=TRUE))
+
+```
+
+
+
+
+## Problem 2:Results:
+
+```{r}
+kable(stats_coef, digits = 3, caption = "Table 2: OLS Estimates")
+#plot
+ggplot(aes(x=n, y=x), data=res_gr)+labs(x="Number of observations", y="OLS Estimation",title = "The OLS estimator as a function of sample size n")+geom_point()+facet_grid(dis~.)+geom_hline(aes(yintercept=mean),colour="red",linetype="dashed",data=stats_coef)+geom_text(aes(0,mean,label=round(mean,2),vjust=-0.5,hjust=-1),size=3.5,data=stats_coef)+theme(plot.title=element_text(hjust=0.5,size=rel(1.2)))
+
+```
+
+
+## Intuition:
+- As we discussed in the lecture, the OLS estimator converges in probability to the true estimator as n increases and thus we show consistency.  
+- Under Cauchy distribution, the moments do not exist and therefore we did not see the convergence.  
+- However, the estimator of the norm converges to the true estimator which by construction is 0.3.  

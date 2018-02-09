@@ -1,0 +1,141 @@
+---
+title: "Assignment IV"
+author: "YEP"
+date: "2/8/2018"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+## 1 Explain to your students
+$$y=1+2x+e$$
+
+
+```{r }
+library(ggplot2)
+library(dplyr)
+library(knitr)
+set.seed(10101)
+
+N <- 10000
+  x <-rexp(N)
+  e <-rnorm(N)
+  y <- 1+2*x+e
+
+data0 <- data.frame(cbind(x,e,y))
+
+dgp0 <- function(n){
+  data2 <- data0  %>% head(n)
+  reg <- lm(y~x, data=data2)
+  
+  res <- cbind(n, t(summary(reg)$coef[2,]))
+  res <- as.data.frame(res)
+  return(res)
+}
+
+params_gr0 <-expand.grid(n=seq(from = 10,to=10000, by = 100)) 
+res_gr0 <-mapply(dgp0, n=params_gr0$n,  SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+
+ggplot(res_gr0, aes(x = n, y=Estimate)) +
+  geom_line() + 
+  theme_bw() +
+  ggtitle("Convergence in probability:")
+
+```
+
+## 1 Explain to your students
+
+```{r }
+dgp1 <- function(n){
+  
+  x <-rexp(n)
+  e <-rnorm(n)
+  y <- 1+2*x+e
+  
+  data <- data.frame(cbind(x,e,y))
+  reg <- lm(y~x, data=data)
+ 
+  
+  res <- cbind(n, t(summary(reg)$coef[2,]))
+  res <- as.data.frame(res)
+  return(res)
+}
+
+params_gr <-expand.grid(1:1000, n=c(5,10,15,20,30,100))
+res_gr <-mapply(dgp1, n=params_gr$n, SIMPLIFY = FALSE) %>%
+  bind_rows()
+
+res_gr <- res_gr %>% mutate(Estimate2=sqrt(n)*(Estimate-2))
+
+
+ggplot(res_gr) +
+  #stat_function(fun = dnorm, aes(colour = "True")) + 
+  geom_density(aes(x=Estimate2, group=as.factor(n), 
+                   colour=as.factor(n), alpha=0.5)) + 
+  scale_color_discrete(breaks=c(5,10,15,20,30,100)) + 
+  theme_bw() +
+  ggtitle("Convergence in distribution")
+ 
+```
+
+## 2 Augustin-Louis Cauchy
+ 
+```{r }
+N <- 10000
+x <-rnorm(N)
+e <-c(rnorm(N),rcauchy(N))
+y <- 0.8+0.3*x+e
+
+data <- data.frame(cbind(x,e,y))
+data <- cbind(data,"dist"=c(rep("Normal",N),rep("Cauchy",N)))
+
+dgp2 <- function(n,distribution){
+  data2 <- data %>% filter(dist==distribution) %>% head(n)
+  
+  reg <- lm(y~x, data=data2)
+  
+  res <- cbind(distribution,n, t(summary(reg)$coef[2,]))
+  res <- as.data.frame(res)
+  return(res)
+}
+
+params_gr <-expand.grid(n=seq(from = 10,to=10000, by = 100), distribution=c("Normal", "Cauchy"))
+res_gr <-mapply(dgp2, n=params_gr$n, distribution=params_gr$distribution, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame() 
+  
+
+mean.n <- res_gr %>% group_by(distribution) %>% summarise(mean=mean(Estimate))
+
+ggplot(res_gr, aes(x = n, y=Estimate, colour=as.factor(distribution)))+
+  geom_line() + 
+  theme_bw() +
+  ggtitle("Convergence in probability:")+
+  labs(color = "Distribution")+
+  geom_hline(aes(yintercept=mean.n[1,2], color="red") ) +
+  geom_hline(aes(yintercept=mean.n[2,2], color="lightblue")) +
+  scale_colour_discrete(labels = c("Normal","Cauchy","Mean","Mean"))
+  
+```
+
+## 2 Augustin-Louis Cauchy
+ 
+```{r }
+res_gr.n <- res_gr %>% filter(distribution==1)
+res_gr.n <- res_gr.n[c(1:5,95:100),]
+kable(res_gr.n, digits = 3, caption = "Table 1: OLS Estimates")
+  
+```
+
+## 2 Augustin-Louis Cauchy
+ 
+```{r }
+res_gr.c <- res_gr %>% filter(distribution==2)
+res_gr.c <- res_gr.c[c(1:5,95:100),]
+kable(res_gr.c, digits = 3, caption = "Table 2: OLS Estimates")
+  
+```

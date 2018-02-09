@@ -1,0 +1,120 @@
+---
+title: "PS4 Franciscans"
+output: ioslides_presentation
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(latex2exp)
+```
+
+## 1. Explaining convergence of An OLS Estimator
+As we increase the sample size, the estimate of beta converges to the true value, (i.e. $(\hat{\beta} - \beta) \xrightarrow{p} 0$). 
+
+However, when we rescale the estimate for the sample size by multiplying by $\sqrt{n}$, $\sqrt{n}(\hat{\beta} - \beta)$ converges to a distribution. This effectively normalizes the variance so that it is no longer dependent on $n$. 
+
+
+
+```{r cars, echo=FALSE}
+remove(list = ls())
+set.seed(10101)
+Simulation1 <- function(sampsize){
+  x <- c(rnorm(sampsize, sd = 1))
+  e <- c(rnorm(sampsize, sd = 1))
+  y <- x + e
+  reg <- lm(y~x)
+  beta  <- reg$coeff[2] - 1
+  se <- summary(reg)$coef[2,2]
+  sqrtbeta <- sqrt(sampsize)*beta
+  return(data.frame("beta"=beta, "sqrtbeta" = sqrtbeta, "se" = se))
+}
+S <- 1000
+
+params_gr <- expand.grid(1:S, sampsize=c(10,100,1000, 10000))
+res_gr <- mapply(Simulation1, sampsize=params_gr$sampsize, SIMPLIFY = FALSE) %>%
+bind_rows() %>% 
+cbind(params_gr)
+```
+
+## Convergence of the Beta estimator
+```{r echo=FALSE}
+ggplot(aes(x=beta, fill = as.factor(sampsize)), data=res_gr)+ geom_density(alpha=I(0.3)) + 
+  labs(fill = "Sample Size", x = TeX('$\\hat{\\beta} - \\beta$'), y = "Density")
+```
+
+## Convergence in distribution
+```{r echo=FALSE}
+ggplot(aes(x=sqrtbeta, fill = as.factor(sampsize)), data=res_gr)+ geom_density(alpha=I(0.3)) + 
+  labs(fill = "Sample Size", x = TeX('$\\sqrt{n}(\\hat{\\beta} - \\beta)$'), y = "Density")
+```
+
+
+
+```{r echo=FALSE}
+remove(list = ls())
+N <- 10000
+set.seed(10101)
+  X <- c(rnorm(N, sd = 1))
+  eN <- c(rnorm(N, sd = 1))
+  eC <- c(rcauchy(N))
+  
+  normdf   <- as_data_frame(X)  %>% 
+    mutate(Y = 0.8 + 0.3*X + eN) %>% 
+    mutate(lab = c(rep("N", N))) %>%
+    `colnames<-`(c("X", "Y", "lab"))
+  cauchydf <- as_data_frame(X)  %>% 
+    mutate(Y = 0.8 + 0.3*X + eC) %>% 
+    mutate(lab = c(rep("C", N))) %>%
+    `colnames<-`(c("X", "Y", "lab"))
+
+  data <- rbind(normdf, cauchydf)
+   
+ols <- function(sampsize, dist){
+  
+  temp = dplyr::filter(data, lab == dist) %>% head(n=sampsize)
+  
+  reg <- lm(Y~X, temp)
+  beta <- reg$coeff[2] 
+
+  rs <- tibble("beta" = beta, "n" = sampsize, "distribution" = dist) 
+  return(rs)
+
+}
+```
+
+```{r echo=FALSE}
+params_gr <- expand.grid(n=seq(10,10000,10), dist=c("N", "C"))
+res_gr <- mapply(ols, sampsize =params_gr$n, dist=params_gr$dist, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+```
+
+## OLS when errors are from two different distributions
+```{r echo=FALSE}
+table <- bind_rows(summarise(filter(res_gr, (distribution == "N")), mean = mean(beta), sd = sd(beta)), summarise(filter(res_gr, (distribution == "C")), mean = mean(beta), sd = sd(beta))) %>% 
+    mutate(distribution = rbind("Normal","Cauchy ")) %>%
+    select(distribution, mean, sd) 
+
+kable(table, col.names = c("Distribution","Mean", "Standard deviation"), caption= "OLS Beta: summary over all  sample sizes", digits = 3)
+```
+
+## OLS estimator and sample size
+In the case of the normally distributed errors, we can use a law of large numbers and the CMT to ensure that $(\hat{\beta} - \beta) \xrightarrow{p} 0$.
+
+However, since the mean of the Cauchy distribution is undefined, we cannot apply a LLN to ensure convergence of the estimate.
+
+```{r echo=FALSE, fig.height = 3, fig.width = 8}
+ggplot(data = res_gr, aes(x=n, y=beta, group = distribution)) + 
+  geom_line(aes(color = distribution), size = 1) +
+  geom_hline(aes(yintercept = table[2,2]), color = "black", linetype="dashed", size = 0.7) +
+  geom_hline(aes(yintercept = table[1,2]), color = "black", linetype="dashed", size = 0.7) + 
+  scale_colour_discrete(name  ="Error distribution",
+  labels=c("Normal", "Cauchy")) + 
+  labs(x = "Sample size", y = "Beta")
+
+```

@@ -1,0 +1,119 @@
+---
+title: "Assignment 4"
+author: "Ozone"
+date: "February 6, 2018"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(broom) # tidy the output
+library(tidyverse) #everything
+library(stargazer) #stata table
+```
+
+
+#1. Explain to your students
+
+$y=3x+2+e$, where $x$ ~ $N(1,1)$, $e$ ~ $\chi^2(2)$
+
+estimator_1 = $\frac{\hat{\beta} - \beta}{std.err(\hat{\beta})}$ is approximately $N(0,1)$
+
+estimator_2 = $\hat{\beta}-\beta$ converges to 0
+
+
+```{r Expalin to your students}
+stimu=function(s){
+dat=data.frame(x=rnorm(s,1,1), err=rchisq(s,1))-1
+dat=mutate(dat,y=3*x+2+err)
+
+beta_hat=lm(y~x,dat) %>% tidy %>% select(term,estimate,std.error)
+beta_hat=beta_hat[2,2:3]
+
+return(beta_hat)
+}
+# t=stimu()
+
+size=1000
+beta_all = mapply(stimu,s=rep(1000,size),SIMPLIFY = FALSE) %>% bind_rows
+beta_all = mutate(beta_all, estimator_1 = (estimate - 3)/std.error, estimator_2 = estimate -3)
+
+# estimator_1 ~ Normal Distribution when sample size is large. "OLS estimator converges to a distribution"
+# estimator_2 will collpases at 0. "OLS estimator coverges to a constant"
+```
+
+# OLS estimator converges to a distribution
+
+```{r plot1}
+ggplot(aes(x=estimator_1),dat=beta_all) +
+  geom_density() + 
+  stat_function(fun=dnorm, colour="blue",args=list(mean=0,sd=1))
+```
+
+# OLS estimator coverges to a constant
+```{r plot2}
+ggplot(aes(x=estimator_2),dat=beta_all) +
+  geom_density() +
+  xlim(-3, 3) +
+  stat_function(fun=dnorm, colour="blue",args=list(mean=0,sd=1))
+
+# beta_melt = beta_all %>% select(estimator_1, estimator_2) %>% melt()
+# ggplot(aes(x=value,fill= factor(variable)), dat=beta_melt) +
+#   geom_density(alpha=0.25) +
+#   facet_grid(variable ~ .)+
+#   stat_function(fun=dnorm, colour="blue",args=list(mean=0,sd=1))
+```
+
+#2. Augustin-Louis Cauchy
+```{r}
+# Dataset Preperation
+dat1=data.frame(
+  X=rnorm(n=20000,mean=0,sd=1), 
+  err=c(rnorm(n=10000,mean=0,sd=1),rcauchy(n=10000, location = 0, scale = 1))
+)
+ 
+dat1=mutate(dat1,y= 0.8+0.3*X+err, dist=c(rep("Normal",10000),rep("Cauchy",10000)))
+
+#Function OLS Slope Coefficient
+stimu1=function(size,distribution){
+  dat_ready=dat1 %>% filter(dist==distribution) %>% head(size)
+  Beta_hat = lm(y~X, dat_ready) %>% tidy 
+  res= Beta_hat %>% filter(term=="X") %>% select(estimate, std.error) %>% as_data_frame
+  res= mutate(res, n=size,dist=distribution)
+  
+return(res) 
+}
+
+
+#Compute the OLS for different n and distribution
+try=expand.grid(n=c(10:10:10000),distribution=c("Normal","Cauchy"))
+res_gr=mapply(stimu1,size=try$n, distribution=try$distribution, SIMPLIFY = FALSE) %>% bind_rows()
+
+#Analysis
+stats_coef = res_gr %>%
+  group_by(dist)%>%
+  summarise(means=mean(estimate), sd=sd(estimate))
+stargazer(as.data.frame(stats_coef), title = "Means and sd of the OLS coefficients", header = F, summary = F)
+
+```
+- In the Normal distribution case, With sample size n inceasing, $\hat{\beta}$ converges to the true value $\beta = 0.3$ as shown in the graph.
+
+- The Cauchy distribution does not have finite moments of any order. Thererfore,it does not satisfy the basic assumptions that $E(y_i^4)<\infty$, to get a consistent estimator of $\beta$. When $n$ goes to infinity, $\hat{\beta}$ will not converge to the true value $\beta = 0.3$.
+
+#Normal
+```{r}
+#Graph Normal
+ggplot(aes(x=n,y=estimate,color=dist),data=res_gr %>% filter(dist=="Normal"))+
+  geom_line()+
+  geom_hline(yintercept=as.numeric(stats_coef[1,2]),linetype="dashed")
+```
+
+#Cauchy
+```{r}
+#Graph Cauchy
+ggplot(aes(x=n,y=estimate,color=dist),data=res_gr %>% filter(dist=="Cauchy")) +
+  geom_line()+
+  geom_hline(yintercept=as.numeric(stats_coef[2,2]),linetype="dashed")
+  
+```
+

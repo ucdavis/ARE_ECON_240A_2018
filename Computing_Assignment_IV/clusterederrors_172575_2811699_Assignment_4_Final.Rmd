@@ -1,0 +1,181 @@
+---
+title: "Assignment 4"
+author: "Clustered Errors"
+output:
+  ioslides_presentation: 
+    widescreen: yes
+  slidy_presentation: default
+  beamer_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+library(knitr)
+library(tidyverse)
+library(dplyr)
+library(broom)
+library(ggplot2)
+```
+
+#Problem 1
+
+## Explain to your students
+```{r consistency}
+# Calculate beta-hat for different sample sizes and show difference from true beta goes to zero as n becomes larger
+dgp <- function(n){
+  #Suppose we have some funky ass error terms that are gamma distributed with  k = 0.5 and theta = 1.
+  e <- rgamma(n,0.5,1) - 0.5
+  #Note that var(e) = 0.5, E(e) = 0
+  #Then supposing that our true beta is one, extract coefficients from regression of y= x+e where x is uniformly distributed between 0 and 20
+  x <- runif(n,0,20)
+  #Note that var(x) = 400/12 E(x) = 10
+  #RunOLSrun
+  coefs <- tidy(lm(x+e ~x))
+  bias <- abs(coefs[2,2] - 1)*100
+  n <- n
+  rets <- cbind(bias, n) %>%
+    as.data.frame()
+  #Make sure returning something that is a row vector with columns and names
+  return(rets)
+}
+
+#Get a lot of betas so we can plot them 
+N <- 5000
+sim_grid <- expand.grid(n=5:N)
+
+dens <- mapply(dgp, n=sim_grid$n, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+    as.tbl()
+
+```
+We present two figures which will demonstrate how $\hat{\beta}$ can converge to both a point and a distribution:
+
+- The first plot demonstrates how $\hat{\beta}$ converges in probability to $\beta$ as $n$ becomes large.
+- The second plot shows how the distribution of $\hat{\beta}$ converges to a normal distribution centered on $\beta$ as $n$ becomes large.
+
+## Convergence Plot
+```{r consistent_plotz}
+# For each sample size, plot a boint that is equal to the estimate of beta minus the true value (which is 1). This difference will approach zero as n becomes very large. This shows that beta hat is consistent.
+consis_plotz <- ggplot(aes(x=n, y=bias), data=dens) + geom_point(size=0.2, shape = 1) + geom_smooth(method=lm, se=FALSE, color = "red")
+plot(consis_plotz)
+
+```
+
+As we can see, the absolute value of the bias trends towards zero as $n$ becomes increasingly large.
+
+## Asymptotic Distribution
+```{r clt_sim}
+#We're going to make a program that creates a plot of the distribution of the betas from OLS for sample sizes ranging from 10 to 100
+dgp <- function(n){
+#Suppose we have some funky ass error terms that are gamma distributed with  k = 0.5 and theta = 1.
+e <- rgamma(n,0.5,1) - 0.5
+#Note that var(e) = 0.5, E(e) = 0
+#Then supposing that our true beta is one, extract coefficients from regression of y= x+e where x is uniformly distributed between 0 and 20
+x <- runif(n,0,20)
+#Note that var(x) = 400/12 E(x) = 10
+#So asymptotically our beta hat should be distributed with variance n/2
+#RunOLSrun
+coefs <- tidy(lm(x+e ~x))
+pt <- sqrt(n)*(coefs[2,2] - 1)
+n <- n
+rets <- cbind(pt, n) %>%
+  as.data.frame()
+#Make sure returning something that is a row vector with columns and names
+return(rets)
+}
+
+#Get a lot of betas so we can plot them 
+s <- 10000
+sim_grid <- expand.grid(s=1:s, n = c(10, 30, 100))
+
+dens <- mapply(dgp, n=sim_grid$n, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+    as.tbl()
+
+```
+
+
+Our estimated coefficients will be asymptotically normally distributed. This means that, regardless of the sample size $N$ we are using now, because our coefficient is a ratio of averages, we can represent our coefficient as being drawn from a normally distributed population centered at the true $\beta$ with variance $\frac{1}{N} \widehat{V}_{\beta}^0$. 
+
+## Asymptotic Distribution
+```{r clt_plotz}
+# For each sample size, make a plot that shows the distribution of the normalized differences from the true beta
+clt_plotz <- ggplot(aes(x=pt, fill=factor(n)), data=dens) + facet_grid(.~n) + geom_density()
+#We can see that these are all approximately normally distributed with mean zero (as expected) and that the change as we increase the sample size comes from increasing the variance of the distribution, which is n/2 in our example.
+plot(clt_plotz)
+```
+
+These plots show that the difference between $\hat{\beta}$ and $\beta$ is centered at zero and normally distributed, starting at very low levels of $N$. 
+
+# Problem 2
+
+##Summary Statistics
+```{r data}
+N = 10000
+#Let Cauchy be distribution 0 and Normal be distribution 1
+dat_gr <- expand.grid(n = 1:N, dist= c(0,1))
+dat_gr$x <- rnorm(N,0,1)
+dat_gr$e <- c(rcauchy(N,0,1), rnorm(N,0,1))
+dat_gr$y <- 0.8 + 0.3*dat_gr$x + dat_gr$e
+dat_set <- as.tbl(dat_gr)
+
+betas <- function(n,distr){
+  dat <- head(filter(dat_set, dist == distr), n=n)
+  OLS <- tidy(lm(y~x, dat))
+  rets <- cbind(n, distr, OLS[1,2], OLS[2,2])
+  colnames(rets) <- c("n", "dist", "int", "beta")
+  rets <- as.data.frame(rets)
+  return(rets)
+  #write something that uses only data before the point n for all N up to 10000 - did it
+}
+
+
+res <- mapply(betas, n= dat_set$n, distr = dat_set$dist, SIMPLIFY = FALSE, USE.NAMES = TRUE) %>%
+  bind_rows() %>%
+  as.tbl()
+
+#TO-DO:
+# (1) replace all 0 with string "cauchy" and 1 with string "normal"
+# (2) make ze table
+# (3) make ze graf
+```
+
+We can see that the mean and standard deviation of the two samples we have drawn are very different between the two distributions we choose for our errors. The errors drawn from the normal distribution lead to a mean of our estimator close to our true $\beta$. The Cauchy errors result in a mean much further away from the true value and have a larger standard deviation.
+```{r Table}
+### Vizualization stuf goes herre
+#noW i kan zu de stuhff 4 de table 
+#makin subsetz cuz i caint figur out how da do da condishanal meenz - i hate r so much
+beta_c <- subset(res, dist == 0) 
+beta_n <-subset(res, dist == 1)
+row_1 <- summarize(beta_c, mean(beta, na.rm = TRUE), sd(beta, na.rm = TRUE))
+colnames(row_1) <- c("Mean", "S.D.")
+row_2 <- summarize(beta_n, mean(beta, na.rm = TRUE), sd(beta, na.rm = TRUE))
+colnames(row_2) <- c("Mean", "S.D.")
+table_1 <- bind_rows(row_1, row_2)
+rownames(table_1) <- c("Cauchy", "Normal")
+kable(table_1, digits = 3, caption = "Table 1: Summary Statistics by Error Distribution")
+```
+
+## Cauchy Plot
+```{r Cauchy plot}
+#makin da graff now
+#Cauchy graff
+beta_c$n <- 1:N
+beta_c$bias_c <- abs(beta_c$beta - .3)
+bias_plotz_c <- ggplot(data=beta_c, aes(x=n, y=bias_c)) + geom_point(size=0.2, shape = 1) + geom_hline(yintercept=mean(beta_c$bias_c, na.rm = TRUE), color= "red")  
+plot(bias_plotz_c)
+```
+
+## Normal Plot
+```{r Normal plot}
+#Normal graff
+beta_n$n <- 1:N
+beta_n$bias_n <- abs(beta_n$beta - .3)
+bias_plotz_n <- ggplot( data=beta_n, aes(x=n, y=bias_n),) + geom_point(size=0.2, shape = 1) + geom_hline(yintercept = mean(beta_n$bias_n, na.rm = TRUE), color= "red")
+plot(bias_plotz_n)
+```
+
+## Conclusion
+When looking at the Cauchy distributed error terms, we can see large jumps for the $\hat{\beta}$ estimate. These jumps come from the large outliers in the error term. The Cauchy distribution is characterized by having no defined moments and large outliers. These outliers will greatly impact the accuracy of our estimation as we see in the figure. 
+
+For the normally distributed errors we see a steady decrease in the volitility of the $\hat{\beta}$ estimates as $n$ increases. This is consistent with theory. 

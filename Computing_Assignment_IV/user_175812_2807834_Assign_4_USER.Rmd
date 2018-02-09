@@ -1,0 +1,118 @@
+---
+title: "Assignment 4"
+author: "USER"
+date: "February 4, 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+## Convergence of the OLS estimator
+
+Two types of convergence for the OLS estimator as the sample size goes to infinity:   
+ 1. Point: the estimator, Beta hat, converges to a constant, the BLP coefficient     
+ 2. Distribution: the scaled estimator, sqrt(n)*(Beta hat - Beta), converges to a normal distribution  
+
+```{r OLS Convergence, fig.height = 4, fig.width = 10}
+rm(list=ls())
+set.seed(1000)
+
+## Convergence to constant ##
+N=1.2^60
+ns = floor(1.2^(10:60))
+x = runif(N)
+y = x + rnorm(N)
+dat1 = data.frame(x,y)
+sim1 = cbind(n = ns, betas = sapply(ns, function(n) as.vector(lm(y ~ x, data=dat1[1:n,])$coef["x"])))
+
+par(mfrow=c(1,2))
+plot(sim1, type="l", log="x", ylab="OLS estimate", main="Convergence to Constant",col="blue")
+abline(h=1, lty=2,col="red")
+
+## Convergence to distribution ##
+ns = floor(1.2^(10:40))
+get.betas.1 = function(){
+  N=1.2^40
+  x = runif(N)
+  y = x + rnorm(N)
+  dat2=data.frame(x,y)
+  sapply(ns, function(n) as.vector(lm(y ~ x, data=dat2[1:n,])$coef["x"]))
+}
+results.1 = replicate(1000, get.betas.1())
+results.dist = (results.1-1)*sqrt(ns)
+
+plot(0, type="n", xlab="sqrt(n)*(Beta hat - Beta)", ylab="Density", main="Convergence in Distribution",
+     xlim=c(-10,10), ylim=c(-0,.12))
+for (d in 1:length(ns)) lines(density(results.dist[d,]), col=rgb(d/length(ns),0,1-d/length(ns),.2), lwd=3)
+curve(dnorm(x, sd=sqrt(12)), add=T, lwd=3, lty=2)
+legend("topleft", legend=c("asymptotic distribution","n~10,","n~100,","n~1000,"),
+       col=c("black",rgb(0,0,1,.2),rgb(.5,0,.5,.2),rgb(1,0,0,.2)), lty=c(2,1,1,1), lwd=rep(3,4),
+       bty = "n", cex=.7)
+```
+
+
+## Different types of errors: Normal vs. Cauchy
+
+When the error follows normal distribution, we have  
+ 1. OLS slope estimator, approaching the correponding BLP coefficient  
+ 2. Mean, close to the correponding BLP coefficient; Sd, close to zero  
+However, when the error follows Cauchy distribution, we have  
+ 1. OLS slope estimator, not approaching the correponding BLP coefficient  
+ 2. Mean, far from the correponding BLP coefficient; Sd, far from zero  
+
+Summary of means and SDs by n:
+
+```{r Normal vs Cauchy- Table}
+library(knitr)
+rm(list=ls())
+set.seed(1234)
+
+get.betas = function(){
+  N=2^13
+  ns = 2^(3:13)
+  x = rnorm(N)
+  err = cbind(normal=rnorm(N), cauchy=rcauchy(N))
+  y = 0.8 + 0.3*x + err
+  dat = data.frame(y, x)
+  cbind(n = ns,
+        normal = sapply(ns, function(n) as.vector(lm(normal ~ x, data = dat[1:n,])$coef["x"])),
+        cauchy = sapply(ns, function(n) as.vector(lm(cauchy ~ x, data = dat[1:n,])$coef["x"])))
+}
+
+results = replicate(1000, get.betas())
+
+types = c("normal", "cauchy")
+results.tab = cbind(apply(results, c(1,2), mean), apply(results, c(1,2), sd)[,-1])
+colnames(results.tab) = c("n", paste(rep(types,2),rep(c("mean","sd"),each=2),sep="."))
+
+kable(results.tab, digits = 3, caption = "Table 1: OLS Estimates")
+```
+
+## Converence for Normal vs. Cauchy (cont.)
+Convergence is clear under normal, whereas cauchy does not converge even for large n
+```{r Normal vs Cauchy- Plot, fig.height = 4, fig.width = 10}
+### Plot ###
+color.names = c("blue","red")
+color.rbg = c(rgb(0,0,1,0.01),rgb(1,0,0,0.01))
+
+par(mfrow=c(1,2))
+for (t in 1:length(types)){
+  bands = t(sapply(1:dim(results)[1], function(x) quantile(results[x,types[t],], c(.05,.95))))
+  means = apply(results[,types[t],], 1, mean)
+  plot(0, type="n", xlab="Sample size", ylab="Beta hat", main=types[t],
+       ylim=range(bands)*1.5, xlim=c(8,max(results[,"n",])), log="x")
+  lines(results[,c("n",types[t]),1], type="l") # One simulation set of N
+  for(i in 2:dim(results)[3]) lines(results[,c("n",types[t]),i], type="l", col=color.rbg[t]) # Each sim
+  for(b in 1:2) lines(results[,"n",1], bands[,b], lty=2, lwd=3, col=color.names[t]) # Interval
+  lines(results[,"n",1], means, lty=3, lwd=3, col=color.names[t]) # Means
+  lines(cbind(results[,"n",1],.3), lty=3, lwd=2) # True Beta
+  legend("topright", legend=c("90% interval","Mean","True Beta","Example Beta path"), col=c(rep(color.names[t],2),rep("black",2)), lty=c(2,3,3,1), lwd=c(3,3,2,1), bty = "n")
+}
+```
+
+Summary of means and SDs for 1 beta path:
+```{r Normal vs Cauchy- Table 2}
+kable(cbind(stat=c("mean","SD"),round(apply(results[,2:3,1], 2, function(x) c(mean(x),sd(x))),3)), caption="Table 2: OLS Estimates")
+```
