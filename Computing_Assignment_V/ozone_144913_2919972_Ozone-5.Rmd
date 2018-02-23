@@ -1,0 +1,107 @@
+---
+title: "Assignment 5"
+author: "Ozone"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(MASS)
+library(plyr)
+library(dplyr)
+library(broom)
+library(tidyr)
+library(ggplot2)
+library(stargazer)
+set.seed(1234)
+```
+## Preliminary questions
+- 1. Under the case $\beta=0$, as $n\to \infty$, Prob(selecting the true model) = Prob(Not reject|H0 is true)= $1-\alpha$, wehre $\alpha$ is the size of the test.
+     Under the case $\beta \neq 0$, as $n\to \infty$, Prob(slecting the true model) = Prob (Reject| H0 is not true) = power = 1 
+- 2. Post-test estimator for $\alpha$ is consistent. Under the case $\beta=0$, no matter whether we choose the restricted model or unrestricted model, the estimator $\hat\alpha$ is unbiased and consistent estimator for the true $\alpha$. Under the case $\beta \neq 0$, as $n \to \infty$, the Prob(selecting the true model) is 1, then $\hat \alpha$ will be consistent with the true $\alpha$. Therefore, the post-test estimator for $\alpha$ is consistent. 
+
+## Simulation (Compare Variance)
+```{r, results='asis'}
+everyday = function(n,beta){
+  X      = mvrnorm(n = n, mu = c(0,0), Sigma = matrix(c(1,0.7,1,0.7),nrow = 2))
+  df     = data.frame(X1 = X[,1],X2 = X[,2],e = rnorm(n))
+  df     = df %>%
+           mutate(y = X1*0.2 + beta*X2 + e)
+  model1 = lm(y ~ 0 + X1 + X2, data = df) # unrestricted model
+  model2 = lm(y ~ 0 + X1, data = df) # restricted model
+  unres  = tidy(model1)
+  res    = tidy(model2)
+  out    = data.frame(model       = c("unres", "res", "select"), 
+                      n           = rep(n,3),
+                      beta        = rep(beta,3),
+                      a           = c(unres$estimate[1],res$estimate[1],NA),
+                      pvalue_b    = c(unres$p.value[2],NA,NA),
+                      avalue      = c(0.2 > confint(model1,"X1")[1] & 0.2 < confint(model1,"X1")[2],
+                                      0.2 > confint(model2,"X1")[1] & 0.2 < confint(model2,"X1")[2],NA))
+  if (out$pvalue_b[1] >= 0.05){
+    out[3,-1] = out[2,-1]
+  }
+  else{out[3,-1] = out[1,-1]}
+  return(out)
+}
+
+myfunction = function(n,beta,s){
+  df   = expand.grid(s=1:s, beta = beta, n = n)
+  df$s = NULL
+  res  = apply(df,1,function(x) everyday(x[2],x[1])) %>% bind_rows()
+  return(res)
+}
+
+test = myfunction(n = seq(50,200,by=50),beta = c(0,0.16,0.24,0.5),s=2000)
+res1 = ddply(test[test$beta==0,],.(beta,model,n),summarize, variance = var(a))
+rownames(res1) = NULL
+stargazer(res1,header = F,summary = F)
+```
+## Compare Variance Comment
+- Under the case of $\beta=0$, holding the sample size $n$ constant, the variance of the restrictive model estimator is the smallest, then the post-test OLS estimator, and the variance of the unrestricted model estimator is the largest. This makes intuitive sense, becasue when $X_2$ is not relevent in the model, including $X_2$ basically adds more noise to the model, which increases the variance of $\alpha$. We see the results shown in class. The post-test OLS estimator is a combination of the restricted and unrestricted estimtors, therefore the size of the post-test OLS estimator variance is between the restricted and unrestricted estimtors.
+
+## Simulation (Bias Computation)
+```{r,results='asis'}
+res2 = ddply(test[test$beta>0,],.(beta,model,n), summarize, bias = mean(a)-0.2)
+res2 = res2[res2$n == 200,]
+res2$true_bias = 0
+res2$true_bias[res2$model == "res"] = res2$beta[res2$model=="res"] *0.7
+res2$true_bias[res2$model == "select"] = NA
+rownames(res2) = NULL
+stargazer(res2,header = F,summary = F)
+```
+## Bias Computation Comment
+- Theoretically, $E[\hat \alpha] - \alpha$ is the bias. When the true model is $y=\alpha X + \beta X2 + \epsilon$ (unrestricted model), where $\beta \neq 0$, $X_1$ and $X_2$ is jointly normal distributed, with sd of 1 and cov of 0.7 and we choose the model $y=\gamma X + e$(restricted model), there will be omitted variable bias. $E[\hat \alpha^{res}|\beta\neq0]-\alpha=\beta  \frac{cov(X_1,X_2)}{Var(X_1)} = \beta \cdot 0.7$. If we esimate the true model(unrestricted model), then there will be no bias because $E[\hat \alpha^{unres}|\beta\neq0]-alpha =0$. For the post-test estimator,  $E[\hat \alpha^{post}|\beta\neq0]- \alpha \neq 0$ and the bias will be smaller if beta is larger and sample size n is larger.
+- Our simulation is line with our theory above. Under the cases $\beta \neq 0$, the bias of the restricted estimator, is around 0.112, 0.168 and 0.35 repectively. The bias of the unrestricted estimator is around 0 as expected. The bias of the post-estimator is bigger than 0, smaller than the restricted estimator, and decreases as $\beta$ and sample size $n$ increases.
+
+## Simulation (Confidence Interval)
+```{r, results='asis'}
+res3 = ddply(test,.(beta,model,n),summarize, true = sum(avalue)/2000)
+rownames(res3) = NULL
+stargazer(res3[res3$n == 200,], header = F, summary = F)
+```
+## Confidence Interval Comment
+- Under the case $\beta = 0$, about 95% of the time the confidence inverval contains the true $\alpha=0.2$ no matter we use restricted, unrestriced or everyday OLS. Under the case $\beta \neq 0$, only the the condidence interval of the unrestricted OLS case, contains the true $\alpha$ around 95% of the time. Because both of the two cases, $\hat \alpha$ is unbiased and the correspoding T statistics is t-distributed. Therefore the 95% confidence interval contains the true $\alpha$ 95% of the times as constructed. 
+- When $\beta \neq 0$, the confidence interval of restricted OLS contains the true $\alpha$ all less than 95% of the time. The bigger the beta is, the less times the confidence interval contains the true beta. Notice that when $\beta$ is 0.5, the confidence interval of the restricted model only have 0.2% of the time containing the true $\alpha$. This makes sence, because the confidence interval is conputed as $[\hat \alpha - c_{0.25} \cdot se(\hat \alpha), \hat \alpha + c_{0.25} \cdot se(\hat \alpha)]$. The bigger the beta is, the more bias the $\hat \alpha$ is, the less time the interval computed based on $\hat \alpha$ will contain the true $\alpha$.
+
+## Confidence Interval Comment (Continue)
+- When $\beta \neq 0$, how many times the confidence interval of post OLS contain $\alpha$ is related to how big the $\beta$ and sample size $n$ is. This could be seen better in the graph in next the slide. Under the case $n=200$ and $\beta=0.5$, the distribution of $\hat \alpha_{post}$ is closer to the distribution of $\hat \alpha_{unres}$ than other $n-\beta$ cases, therefore the times of the confidence interval containing the true $alpha$ is the highest, 86% of the time. Under $\beta \neq 0$, the closer the distribution of $\sqrt{n} \cdot (\hat \alpha_{post}-0.2)$ is to the distribution of $\sqrt{n} \cdot (\hat \alpha_{unres}-0.2)$, the time containing the true $alpha$ will be more close to 95%.
+
+## Simulation (Plots)
+```{r}
+res4 = ddply(test[test$model == "unres",],.(model,n,beta),summarize, t_test_mean = sum(pvalue_b<0.05)/2000)
+test %>% mutate(everyday_ols = ifelse(model == "select",T,F), alpha_n = sqrt(n)*(a - 0.2)) %>%
+  ggplot(aes(x = alpha_n, fill = everyday_ols, linetype = model)) + 
+    geom_density(alpha = I(0.5)) + 
+    facet_grid(n ~ beta) +
+    annotate("text",label = res4$t_test_mean,x = -2,y=0.4)
+```
+
+## Simulation Plots Comment
+- $\sqrt{n} \cdot (\hat \alpha-0.2)$ is asymptotically  $N(0,V_{\alpha})$ distributed when $n \to \infty$ and we use the correct model.
+- If n is big and the ture $\beta$ is much bigger than zero, the distribution of the post-test OLS is closer to the true distribution.  
+- The bigger the $\beta$ and $n$ is, the higher the percentage of rejection of the t-test for $\beta$. 
+
+## Summary
+- Consistency holds no matter whether the ture $\beta$ and the $\beta$ under the null hypothesis are equal or not. Unbiasness does not hold in small sample if the ture $\beta$ and the $\beta$ are different. Efficiency does not hold. 
+- If "the sample size is big and the ture $\beta$ and the $\beta$ under the null hypothesis are very different" OR "the true $\beta$ is the $\beta$ under the null hypothesis", the usual OLS distribution approximate the distribution of the post-test OLS.  

@@ -1,0 +1,169 @@
+---
+title: "HW_5"
+author: "Tristan Hanon"
+date: "February 20, 2018"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(broom)
+library(MASS)
+library(knitr)
+```
+
+# Preliminary Questions
+
+## Preliminary Question 1
+Let $A$ be the size of the test that corresponds to critical value $c$.
+
+Consider the case where $\beta \neq 0$. Then Pr(select true model) = Pr($|t| > c$).
+
+Pr($|t| > c$) = Pr$\left( \left| \frac {\sqrt{n}(\hat{\beta} - \beta)} {\sqrt{\hat{V}_{\beta}}} + \frac {\sqrt{n}\beta} {\sqrt{\hat{V}_{\beta}}}\right| >c\right)$
+
+= Pr$\left[ \left| N \left( \frac {\sqrt{n}\beta} {\sqrt{\hat{V}_{\beta}}}, 1 \right) \right| > c \right]$.
+
+Notice that this probability approaches 1 as $n \rightarrow \infty$. Thus in a sufficiently large sample we will include $X_2$ in the model if it should be included.
+
+## 
+Next consider the case where $\beta = 0$.
+
+Then Pr(select true model) = Pr($|t| < c$).
+
+Pr($|t| < c$) = Pr$\left(\left|\frac{\sqrt{n}(\hat{\beta} - \beta)}{\sqrt{\hat{V}_{\beta}}} + \frac {\sqrt{n}\beta} {\sqrt{\hat{V}_{\beta}}} \right| < c\right)$
+
+= Pr$\left(\left|N\left(0, 1 \right) \right| < c\right)$ = $1-A$.
+
+Notice that this probability is constant as $n \rightarrow \infty$. Thus if we should exclude $X_2$ from the model, the probability of selecting the correct model does not approach 1 as $n \rightarrow \infty$.
+
+We could force this probability to approach 1 by decreasing the size of the test as $n \rightarrow \infty$, so that $A_{n}>A_{n+1} \forall n$.
+
+## Preliminary Question 2
+Notice that given our results so far, in a sufficiently large sample, we don't have to worry about misspecificiation.
+
+That is, as $n \rightarrow \infty$, we will include $X_2$ when we are meant to, although we may also sometimes include $X_2$ when we don't have to. However, this is not a worry!
+
+The estimator $\left( \alpha \  \beta \right)' = (X'X)^{-1}(X'Y)$ is consistent for $\alpha$ in either the case of $\beta = 0$ or $\beta \neq 0$ (as long as we don't leave out $X_2$ when it belongs in the model), so that the post-test estimator of $\alpha$ is consistent.
+
+# Simulation
+
+```{r simulation_function}
+sim <- function(n, beta) {
+  # Generate data
+  e <- rnorm(n)
+  sigs <- matrix(data = 1, 2, 2)
+  sigs[2,1] <- 0.7
+  sigs[1,2] <- 0.7
+  x <- mvrnorm(n, mu = c(0, 0), Sigma = sigs)
+  x_1 <- x[, 1]
+  x_2 <- x[, 2]
+  y = 0.2 * x_1 + beta * x_2 + e
+  data <- as.data.frame(cbind(y, x_1, x_2))
+  
+  
+  # Run Regression
+  restricted <- lm(y ~ x_1, data)
+  unrestricted <- lm(y ~ ., data)
+  test <- ifelse( (summary(unrestricted)$coefficients[3, 4] < 0.05), TRUE, FALSE)
+  if (test == TRUE) {
+    everyday <- lm(y ~ ., data)
+  } else {
+    everyday <- lm(y ~ x_1, data)
+  }
+  
+  # Construct Data Output
+  reg_output <- tibble(names = c("restricted", "unrestricted", "everyday"), 
+                       reg = list(restricted, unrestricted, everyday), 
+                       alpha = c(coef(restricted)["x_1"], coef(unrestricted)["x_1"], coef(everyday)["x_1"]),
+                       p_val = c(NA, summary(unrestricted)$coefficients[3, 4], ifelse((summary(lm(y ~ ., data))$coefficients[3, 4] < 0.05), summary(lm(y ~ ., data))$coefficients[3, 4], NA)),
+                       variance = c(summary(restricted)$coefficients[2,2], summary(unrestricted)$coefficients[2,2], summary(everyday)$coefficients[2,2]),
+                       bias = c(summary(restricted)$coefficients[2,1] - beta, summary(unrestricted)$coefficients[2,1] - beta, summary(everyday)$coefficients[2,1] - beta),
+                       alpha_ci = c((0.2 > confint(restricted)["x_1", 1] & 0.2 < confint(restricted)["x_1", 2]),
+                                    (0.2 > confint(unrestricted)["x_1", 1] & 0.2 < confint(unrestricted)["x_1", 2]),
+                                    (0.2 > confint(everyday)["x_1", 1] & 0.2 < confint(everyday)["x_1", 2])),
+                       alpha_dist = c(sqrt(n)*(coef(restricted)["x_1"] - 0.2), sqrt(n)*(coef(unrestricted)["x_1"] - 0.2), sqrt(n)*(coef(everyday)["x_1"] - 0.2)),
+                       which_model = c(NA, NA, ifelse((test == TRUE), "unrestricted", "restricted")))
+  return(reg_output) 
+}
+```
+
+```{r apply_function_to_grid}
+n_beta <- expand.grid(n = c(50, 100, 150, 200), beta = c(0, .16, .24, .5))
+
+sim_output <- mutate(n_beta, simulations = map2(beta,n,  ~rerun(2000, sim(n = .y, b = .x)) %>% bind_rows))
+
+unnested_sims <- unnest(sim_output, simulations)
+```
+
+## Question 2: Variance
+
+```{r question_2_variance}
+variance_data <- group_by(unnested_sims, beta, names) %>% 
+  summarize(mean_variance = mean(variance))
+variance_data <- variance_data[seq(1,3,1), ]
+kable(variance_data, digits = 3, caption = "Table 1: Variance of Estimators Given Beta = 0")
+```
+
+We do indeed see the results shown in class. The variance of the unrestricted estimator is higher than the variance of the restricted estimator. Understandably, the variance of the "everyday" estimator is between the two, though closer to the restricted result. 
+
+## Question 3: Bias
+
+```{r question_3_bias}
+bias_data <- group_by(unnested_sims, beta, names) %>% 
+  summarize(mean_bias = mean(bias))
+bias_data <- bias_data[seq(4,12,1), ]
+kable(bias_data, digits = 3, caption = "Table 2: Bias of Estimators Given Beta Not Zero")
+```
+
+## Question 3: Bias
+
+If the covariance of the right hand side variables is zero or the true $\beta$ parameter value is zero, then there will be no omitted variable bias of the $\alpha$ parameter. Since we have created data that we know has positive covariance, we will avoid OVB only when $\beta = 0$.
+
+Here, we are able to look at all cases when $\beta \neq 0$ in the table above. We find that the $\alpha$ estimator from the unrestricted model tends to have lower bias than the restricted and everyday models, which is consistent with expectations. 
+
+## Question 4: Alpha in the Confidence Interval
+
+```{r question_4_ci}
+ci_data <- group_by(unnested_sims, beta, names) %>%
+  summarize(mean_alpha_in_ci = mean(alpha_ci))
+kable(ci_data, digits = 3, caption = "Table 3: Average Times Where Alpha is in the CI")
+```
+
+## Question 4: Alpha in the Confidence Interval
+
+For all $\beta$ values, we find that $\alpha$ is in the confidence interval around 95% of the time in the unrestricted model. We find similar results when $\beta$ is actually equal to zero, however, when $\beta$ is different from zero, $\alpha$ is in the confidence interval far less frequently for both the restricted and everyday models. As usual, the everyday model lies in between the restricted and unrestricted cases. 
+
+## Question 5: Plotted Densities
+
+```{r question_5_plot}
+plot_data <- subset(unnested_sims, names != "everyday")
+ggplot(data = plot_data, aes(x = alpha_dist, color = names)) + 
+  geom_density() + 
+  facet_grid(n ~ beta)
+```
+
+## Question 5: Plotted Densities
+
+We find that in all cases, the distributions are approximately normally distributed, becoming more so in larger samples. When $\beta = 0$, the restricted model and unrestricted models are centered on zero, but the unrestricted model has a wider variance, as seen previously. When $\beta$ is not equal to zero, we find that the $\alpha$ estimator from the restricted model is not consistent.
+
+## Question 6: Plot of Alphas
+
+```{r question_6}
+mutate(unnested_sims, type = ifelse(names == "everyday", TRUE, FALSE)) %>%
+  ggplot(aes(x = alpha, fill = type, linetype = names)) +
+  geom_density(alpha = I(0.5))
+
+# Matthieu we don't really know what you want in the annotation. So we did not include it.
+```
+
+## Conclusion
+
+As we can see, the everyday OLS is biased when the true $\beta$ value is not equal to zero, though not as significantly as the restricted model. When $\beta$ is equal to zero, however, we do see that the variance is lower than in the unrestricted case. In general, using the everyday OLS model leads to an estimator that is less biased than the restricted case. 
+
+In the previous plot, we see that the post-test distribution is close to the unrestricted distribution. Though the distributions are not exactly the same, they are much closer than the restricted distribution is. 
+
+
+
+
+

@@ -1,0 +1,224 @@
+---
+title: "6PM_assign_5"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Proof of the consistency of t-test
+- t-test: 
+\[ H_0: \beta = 0 \ vs. \ H_a: \beta \neq 0  \]
+If the true model is when $\beta = 0$, then
+\[ t = \frac{\hat{\beta}}{\sqrt{\frac{1}{n}\hat{V}_{\beta}}} 
+= \frac{\sqrt{n}\hat{\beta}}{\sqrt{\hat{V}_{\beta}}} \overset{d}{\longrightarrow} N(0, 1) \]
+and as $n \rightarrow \infty$
+\[ Pr( |t| < c | H_0 \ is \ true ) \rightarrow 1 - \alpha \neq 1 \]
+Maybe lowering $\alpha \rightarrow 0$ will make it consistent.
+
+-------------
+
+On the other hand, if the true model is when $\beta \neq 0$, then
+\[ t = \frac{\hat{\beta}}{\sqrt{\frac{1}{n}\hat{V}_{\beta}}} 
+= \frac{\sqrt{n}(\hat{\beta} - \beta)}{\sqrt{\hat{V}_{\beta}}} + \frac{\sqrt{n}\beta}{\sqrt{\hat{V}_{\beta}}} = Z + \sqrt{n}\frac{\beta}{\sqrt{\hat{V}_{\beta}}}\]
+and as $n \rightarrow \infty$, $t \rightarrow \infty$
+\[ Pr( |t| >c | H_a \ is \ true ) \rightarrow 1 \]
+t-test is consistent in this case.
+
+## Consistency of Post-test Estimator of $\alpha$
+- $\hat{\alpha}_u$ is always consistent for $\alpha$, while $\hat{\alpha}_r$ is consistent for $\alpha$ only if $\beta = 0$. If the post-test estimator acts as follows:
+$$
+\begin{align}
+  \hat{\alpha}_{pt} = 
+  \begin{cases}
+  \hat{\alpha}_r && \text{if} \ \beta = 0 \ 
+  \text{and t-test doesn't reject} \ H_0 \\
+  \hat{\alpha}_u && \text{if} \ \beta \neq 0 \ 
+  \text{and t-test rejects} \ H_0
+  \end{cases}
+\end{align}
+$$
+then $\hat{\alpha}_{pt}$ is consistent for $\alpha$.
+
+As we've shown earlier, even if $n \rightarrow \infty$, we may not reject $H_0$ when $\beta = 0$, we'll choose unretricted OLS. But $\hat{\alpha}_u$ is always consistent for $\alpha$, so we are fine in this case. On the other hand, when $\beta \neq 0$, as $n \rightarrow \infty$, we will eventurally correctly reject $H_0$, and we choose $\hat{\alpha}_u$, which is consistent as well. So post-test estimator will always be consistent for $\alpha$.
+
+
+```{r , results = "hide", message=FALSE}
+library(lmtest) # coeftest
+library(sandwich) # vcovHC
+library(dplyr)
+library(broom) # tidy the output
+library(knitr) # For knitting document and include_graphics function
+library(png)      # For grabbing the dimensions of png files
+library(magrittr)
+library(tidyverse) #everything
+select <- dplyr::select
+rm(list = ls())      # clean the workspace
+
+sigma <- matrix(c(1,0.7,0.7,1),2)
+Myalphas <- function(n,beta){
+  e <- rnorm(n,0,1)
+  X <- MASS::mvrnorm(n, rep(0, 2), sigma)
+  X1 <- X[,1]
+  X2 <- X[,2]
+  y <- 0.2*X1 + beta*X2 + e
+  dgp <- data.frame(y,X1,X2)
+  reg_r <- lm(y ~ X1 - 1, data = dgp)
+  reg_u <- lm(y ~ X1 + X2 - 1, data = dgp)
+  reg_df <- data_frame(
+    name=c("reg_r", "reg_u"), 
+    data=list(reg_r, reg_u))
+  stat <- summarise(reg_df,
+                    n = n,
+                    beta= beta,
+                    alpha_r = summary(reg_r)$coefficients[1,1],
+                    alpha_u = summary(reg_u)$coefficients[1,1],
+                    inCI_r = (0.2>confint(reg_r)["X1",1] & 0.2<confint(reg_r)["X1", 2]),
+                    inCI_u = (0.2>confint(reg_u)["X1",1] & 0.2<confint(reg_u)["X1", 2]),
+                    reject = (summary(reg_u)$coefficients[2,4] < 0.05))
+  return(stat)
+}
+
+S <- 2000
+size_gr <- expand.grid(1:S, n=c(50,100,150,200), beta=c(0,0.16,0.24,0.5))
+simu_gr <- mapply(Myalphas, n=size_gr$n, beta = size_gr$beta, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+```
+
+
+```{r statistics, results = "hide", message=FALSE}
+rej_rate <- simu_gr %>%
+  group_by(n,beta)%>%
+  summarise(rate=mean(reject))
+
+alpha <- simu_gr %>%
+  mutate(alpha_pt = reject*alpha_u+(1-reject)*alpha_r,
+         inCI_pt = reject*inCI_u + (1-reject)*inCI_r) %>%
+  dplyr::select(n,beta,alpha_r,alpha_u, alpha_pt)
+
+temp <- alpha %>%
+  mutate(alpha = alpha_r, model = "restricted")%>%
+  select(n,beta,alpha, alpha_pt, model)
+
+# small redundant change
+
+temp2 <- alpha %>%
+  mutate(alpha = alpha_r, model = "restricted")%>%
+  dplyr::select(n,beta,alpha, model)
+
+temp3 <- alpha %>%
+  mutate(alpha = alpha_u, model = "unrestricted")%>%
+  dplyr::select(n,beta,alpha, model)
+
+temp4<- alpha %>%
+  mutate(alpha = alpha_pt, model = "post-tested")%>%
+  dplyr::select(n,beta,alpha, model)
+  
+alpha2<- temp2 %>%
+  rbind(temp3)%>%
+  rbind(temp4)%>%
+  mutate(type=ifelse(model=="post-tested", TRUE, FALSE),
+         dist=sqrt(n)*(alpha - 0.2))
+  
+# Q5
+alpha <- alpha %>%
+  mutate(alpha = alpha_u, model = "unrestricted")%>%
+  select(n,beta,alpha,alpha_pt, model) %>%
+  rbind(temp) %>%
+  mutate(I = (alpha_pt == alpha),
+         dist=sqrt(n)*(alpha - 0.2))
+# The statistics we need for Q2-4
+result <- mutate(simu_gr,
+                 alpha_pt = reject*alpha_u + (1-reject)*alpha_r,
+                 inCI_pt = reject*inCI_u + (1-reject)*inCI_r,
+                 bias_r = alpha_r - 0.2,
+                 bias_u = alpha_u - 0.2,
+                 bias_pt = alpha_pt - 0.2) %>%
+  group_by(beta,n) %>%
+  summarise(
+    var_r = var(alpha_r),
+    var_u = var(alpha_u),
+    var_pt = var(alpha_pt),
+    coverage_r = mean(inCI_r),
+    coverage_u = mean(inCI_u),
+    coverage_pt = mean(inCI_pt),
+    mean_bias_r = mean(bias_r),
+    mean_bias_u = mean(bias_u),
+    mean_bias_pt = mean(bias_pt)
+)
+```
+
+
+## Variances of Three Estimators under Null
+```{r variance}
+variance <- result %>%
+  filter(beta == 0) %>%
+  select(n,beta, var_r,var_u,var_pt)
+colnames(variance) <- c("n","beta","Restricted","Unrestricted","Post-test")
+kable(variance, digits = 3, caption = "Variance of Three Estimators under Null")
+```
+
+- Under null hypothesis, variance of the unrestricted model is the largest, while the restricted model has the lowest variance. The variance of the post-tested model falls in the middle of the two.
+
+
+## Mean of Biases under Alternative
+```{r bias}
+mean_bias <- result %>%
+  filter(beta != 0) %>%
+  select(n,beta,mean_bias_r,mean_bias_u,mean_bias_pt)
+colnames(mean_bias) <- c("n","beta","Restricted","Unrestricted","Post-test")
+kable(mean_bias, digits = 3,longtable = TRUE, caption = "Mean of Biases under Alternative")
+```
+
+------------
+
+- For the unrestricted model, it is always unbiased.
+- For the restricted model, under alternative hypothesis when $\beta \neq 0$, it's biased upward and it's more severe when $\beta$ is larger and n gets larger.
+- For the post-tested model, it's biased upward, but when $\beta$ is far from zero and n gets larger bias goes away since null hypothesis is more likely to be rejected and we choose unrestricted model.
+- Bias is always upward, and it's consistent with the omitted-variable bias formula ($\beta > 0, cov(X1,X2) >0$).
+
+## Coverage of the CI
+
+```{r coverage}
+coverage <- result %>%
+  select(n,beta,coverage_r,coverage_u,coverage_pt)
+colnames(coverage) <- c("n","beta","Restricted","Unrestricted","Post-test")
+kable(coverage, digits = 3, longtable = TRUE, caption = "Coverage of the CI")
+```
+
+-----------
+- Under $H_0$, all estimators have the coverage approximately equal to 95%.
+- Under $H_1$, for the restricted model, the coverage decreases as $\beta$ and n get larger.
+- - For the unrestricted model, it stays approximately 95%.
+- - For the post-tested model, with small sample size, as beta increases, we are getting worse coverage; for smaller bias (e.g 0.16), the coverages get worse as sample size increases; however, for large bias (i.e 0.5), as sample size increases, the coverage also increases, eventually approches 95%.
+
+
+## Density of the Standardized Distribution
+
+```{r density}
+ggplot(alpha, aes(x=dist, fill=model)) +
+  geom_density(alpha=I(0.5)) +
+  facet_grid(n~beta) +
+  geom_vline(xintercept= 0.2)
+```
+
+## Comments
+
+- Under $H_0: \beta =0$, both estimators are unbiased.
+- Under $H_1: \beta \neq 0$, as n gets larger, unrestricted estimator is still unbiased, but restricted ones are always biased upward. 
+- This is consistent with the omitted-variable bias formula.
+
+## Add post-test Estimator
+
+```{r post-test}
+ggplot(alpha2, aes(x=alpha, fill= type, linetype= model)) +
+  geom_density(alpha=I(0.5))+
+  facet_grid(n~beta)+
+  annotate("text", label=rej_rate$rate, x=-0.2,y=4)
+```
+
+## Summarize
+- Under $H_1$, everyday OLS is consistent but not unbiased. As sample size gets larger the distribution of the everyday OLS converges to the unbiased OLS distribution.
+- Under $H_0$, it converses to the distribution of the restricted OLS. However, under $H_1$, it converges to the distribution of the unrestricted model. Also when beta is larger, it converges faster.

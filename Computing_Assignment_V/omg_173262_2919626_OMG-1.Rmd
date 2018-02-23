@@ -1,0 +1,179 @@
+---
+title: "Computing Assignment V"
+author: "OMG"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Preliminary Questions
+**1. Is the t-test procedure consistent?**
+
+$$t = \frac{\hat{\beta}-\beta_o}{s(\hat\beta)} = \frac{\hat{\beta}-\beta}{s(\hat\beta)} + \frac{\beta-\beta_o}{s(\hat\beta)} $$
+If $\beta=0$, this converges in distribution to $\sim \mathrm{N}(0,1)$. Hence $P(|T(\hat\beta)|>Z_{\alpha/2}=1-\alpha$ as N goes to infinity.  
+**The test procedure is not consistent.**
+
+If $\beta > 0$, this converges in distribution to $\sim \mathrm{N}(0,1) + \infty$. Hence $P(|T(\hat\beta))|>Z_{\alpha/2}=1$ as N goes to infinity.  
+**The test procedure is consistent.**
+
+
+**2. Is the post-test estimator for $\alpha$ consistent?**
+
+**Yes.**  If  if $\beta=0$, we use the restricted model and $\hat{\alpha} \rightarrow \alpha$ assuming that $E[e|X_1]=0$. If $\beta \neq0$, then we use the unrestricted model and $\hat{\alpha} \rightarrow \alpha$ given the error term in the unrestricted model is not correlated with $X_1$.
+
+## Variances of Estimated Alphas
+
+```{r include=FALSE}
+library(tidyverse)
+library(broom)
+library(knitr)
+library(MASS)
+
+#estimate beta of the linear projection model
+
+simulate<-function (simul,n,beta){
+X <- mvrnorm(n=n, mu=c(0,0),Sigma=matrix(c(1,0.7,0.7,1), nrow=2,ncol=2) )
+e <- rnorm(n=n)
+y <- 0.2*X[,1]+beta*X[,2]+e
+df <- data.frame(X1=X[,1], X2=X[,2],y)
+unrestrict <- lm(y~.,data=df) 
+alpha_u<- coef(unrestrict)[2]
+#alpha=coef <- summary(unrestrict)$coefficients[2, 1]
+alpha_inCI_u <- (0.2>confint(unrestrict)["X1",1] & 0.2<confint(unrestrict)["X1", 2])
+beta_hat_u <- summary(unrestrict)$coefficients[3, 1]
+beta_pval_u <- summary(unrestrict)$coefficients[3, 4]
+dfout <- data.frame(simul=simul, n=n,type="unrest", beta=beta, alpha_hat=alpha_u, alpha_inCI=alpha_inCI_u, beta_hat=beta_hat_u,  beta_pval=beta_pval_u)
+restrict <- lm(y~.-X2,data=df) 
+alpha_r=coef <- summary(restrict)$coefficients[2, 1]
+alpha_inCI_r <- (0.2>confint(restrict)["X1",1] & 0.2<confint(restrict)["X1", 2])
+beta_hat_r=NA
+beta_pval_r=NA
+dfout2=data.frame(simul=simul, n=n,type="rest", beta=beta, alpha_hat=alpha_r, alpha_inCI=alpha_inCI_r, beta_hat=beta_hat_r,  beta_pval=beta_pval_r )
+if (beta_pval_u<0.05){
+  dfout3=data.frame(simul=simul, n=n,type="post", beta=beta, alpha_hat=alpha_u, alpha_inCI=alpha_inCI_u, beta_hat=beta_hat_u,  beta_pval=beta_pval_u)
+}
+else{
+  dfout3= data.frame(simul=simul, n=n,type="post", beta=beta, alpha_hat=alpha_r, alpha_inCI=alpha_inCI_r, beta_hat=beta_hat_r,  beta_pval=beta_pval_r )
+}
+dfout4=rbind(dfout,dfout2,dfout3)
+return(dfout4)
+
+}
+
+#generate grid
+S <- 2000
+params_gr <- expand.grid(1:S, size=c(50,100,150,200), betas=c(0,0.16,0.24,0.5))
+res_gr <- mapply(simulate, simul=1:S ,n=params_gr$size, beta=params_gr$betas ,SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+```
+
+```{r}
+#2 in the case of beta=0, compare the variances of alpha_hats
+stats_coef <- res_gr %>%
+  filter(beta==0) %>%
+  group_by(n,type) %>%
+  summarise(sd_coef=var(alpha_hat)) %>%
+  spread(n,sd_coef)
+
+kable(stats_coef, digits = 3, format = "markdown", caption = "Table 2: variances of estimators beta=0")
+```
+
+In class we saw that the restricted ols is more efficient when the restriction is correct ($\beta=0$), which we observe in the simulations.  
+
+The variance under the post-test estimator is between the restricted and unrestricted variances. The post-test estimator variance  seems to be converging quickly to the restricted estimator variance as sample size increases. In the limit we do not expect full convergence as 5% the test will be wrong.
+
+## Bias of the Three Estimators
+
+```{r echo=FALSE}
+stats_coef <- res_gr %>%
+  filter(beta!=0)%>%
+  group_by(beta,n,type)%>%
+  summarise(bias=mean(alpha_hat)-0.2)%>%
+  spread(n,bias)
+kable(stats_coef, digits = 3, caption = "Table 3: bias of estimators beta not 0")
+```
+
+The unrestricted estimator is unbiased, while the restricted and post-test estimators are biased. However the post-test estimator is consistent, as discussed previously.   
+
+Post-test bias is getting smaller and smaller as the sample size increases and as the true beta moves away from $\beta_o$, the bias decreases to zero, suggesting the power of the test is good.
+
+
+## Alpha Contained in the CI
+
+```{r echo=FALSE}
+stats_coef <- res_gr %>%
+  group_by(beta,n,type) %>%
+  summarise(CI_times=mean(alpha_inCI)) %>%
+  spread(n,CI_times)
+kable(stats_coef, digits = 3, caption = "Table 4: Average times that alpha is in CI")
+```
+
+When $\beta = 0$, the post-test contains $\alpha$ in the CI with the least frequency.  The restricted and unrestricted estimators are accurate and in the limit the restricted will converge to 0.95. 
+
+When $\beta \neq 0$, the restricted model contains $\alpha$ in the CI with the least frequency, followed by the post-test model, and the unrestricted model contains $\alpha$ in the CI with the highest frequency. This suggests that the unrestricted model should be the true model when $\beta \neq 0$, which we would expect.
+
+## Density of Standard Distribution 
+
+```{r echo=FALSE}
+stats_coef <- res_gr %>%
+  filter(type %in% c("rest", "unrest"))%>%
+  group_by(beta,n,type) %>%
+  mutate(sddist=sqrt(n)*(alpha_hat-0.2))
+
+plotA <- ggplot(aes(x=sddist), data=stats_coef)+
+  geom_density()+
+  facet_grid(n~beta)+
+  labs(title = "Density of Standard Distribution")
+
+plot(plotA)
+```
+
+When $\beta = 0$, the restricted model and unrestricted estimate of $\hat\alpha$ are both centered around the true value of $\alpha$ so the standardized distribution, $\sqrt{n}(\hat\alpha - 0.2)$, is centered at 0.  
+
+As $\beta$ moves away from 0, we see a bimodal density as the restricted and unrestricted $\hat\alpha$ diverge.  
+
+## Density of the Estimators
+
+```{r echo=FALSE}
+#6 density of the estimators
+stats_coef <- res_gr %>%
+mutate(sddist=sqrt(n)*(alpha_hat-0.2))%>%
+mutate(n_type=ifelse(type=="post", TRUE, FALSE)) %>%
+mutate(t_test=ifelse(beta_pval<0.05,1,0))
+
+
+t_test_mean <- stats_coef %>%
+filter(type=="unrest") %>%
+group_by(n,beta,type) %>%
+summarise(t_test_mean=mean(t_test,na.rm=TRUE)) 
+t_test_mean <- round(as.vector(t(t_test_mean[,4])),3)
+
+plotB <- ggplot(aes(x=sddist, fill=n_type, linetype=type),data=stats_coef) +
+geom_density(alpha=I(0.5)) +
+facet_grid(n~beta)+
+annotate("text",label=t_test_mean, x=2, y=0.4) +
+labs(x="Estimators for standardized alpha", title = "Density of the Estimators") +
+scale_fill_manual(values=c("white", "black"),name  ="Post")+
+scale_linetype_manual(values=c("solid", "longdash","dotted"),name  ="Type")
+stats_coef <- res_gr %>%
+mutate(n_type=ifelse(type=="post", TRUE, FALSE)) %>%
+mutate(t_test=ifelse(beta_pval<0.05,1,0))%>%
+group_by(beta,n,type,alpha_hat,n_type,t_test) 
+
+
+plot(plotB)
+```
+
+##Results
+
+```{r include=FALSE}
+#table
+
+stats_coef <- res_gr %>%
+  group_by(beta,n,type) %>%
+  summarise(alpha_coef=mean(alpha_hat), sd_coef=sd(alpha_hat),mean_apha_inCI=mean(alpha_inCI),sd_apha_inCI=sd(alpha_inCI))
+kable(stats_coef, digits = 3, caption = "Table 1: OLS Estimates")
+```

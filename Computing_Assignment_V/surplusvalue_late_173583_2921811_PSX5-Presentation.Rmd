@@ -1,0 +1,344 @@
+---
+title: "PSX5"
+author: "Surplus Value"
+date: "2/22/2018"
+output: 
+beamer_presentation:
+latex_engine: xelatex
+---
+
+
+##Start
+```{r chunk_name, echo=FALSE}
+library(sandwich)
+library(lmtest)
+library(broom)
+library(tidyverse)
+library(MASS)
+
+mu <- c(0,0)
+Sigma <- as.matrix(rbind(c(1,0.7),c(0.7,1)))
+```
+
+##Function
+```{r , echo=FALSE}
+simul <- function(n=n, beta=beta) {
+  alpha <- rep(0.2,n)
+  beta  <- rep(beta,n)
+  e <- rnorm(n, mean=0, sd=1)
+  X <- mvrnorm(n,mu,Sigma)
+  X1<- as.vector(X[,1])
+  X2<- as.vector(X[,2])
+  y <- alpha*X1+beta*X2 + e
+  df <- data_frame(y,X1,X2)
+  reg <-lm(y~X1 + X2-1, data=df)
+  alphaHat <- coeftest(reg)[1,1]
+  betaHatPvalue <- coeftest(reg)[2,4]
+  Conf <- 0.2 > confint(reg)["X1",1] & 0.2 < confint(reg)["X1",2]
+  regres <-lm(y~X1-1, data=df)
+  alphaHatRes <- coeftest(regres)[1,1]
+  ConfRes <- 0.2 > confint(regres)["X1",1] & 0.2 < confint(regres)["X1",2]
+  
+  
+  if (coef(summary(reg))[2,1] < .05) {
+    reg_everyday <- reg
+  }
+  
+
+  if (coef(summary(reg))[2,1] > .05) {
+    reg_everyday <- regres
+  }
+  
+  Confeveryday <- 0.2 > confint(reg_everyday)["X1",1] & 0.2 < confint(reg_everyday)["X1",2]
+  
+  
+  rs<- c(alphaHat,betaHatPvalue,Conf,alphaHatRes,ConfRes,coeftest(reg_everyday)[1,1],Confeveryday)
+  return(rs)
+}
+```
+
+#1
+```{r , echo=FALSE}
+S <- 2000
+params_gr <-expand.grid(1:S, n=c(50,100,150,200),  beta=c(0,.16,.24,.5))
+res_gr <-mapply(simul, n=params_gr$n, beta=params_gr$beta, SIMPLIFY = FALSE)
+frame <- data.frame(matrix(unlist(res_gr), ncol=7, byrow = S*16))
+dfchunk <- split(frame, factor(sort(rank(row.names(frame))%%4)))
+df0 <- as.data.frame(dfchunk["0"])
+df16 <- as.data.frame(dfchunk["1"])
+df24 <- as.data.frame(dfchunk["2"])
+df5 <- as.data.frame(dfchunk["3"])
+
+head(df0)
+head(df16)
+head(df24)
+head(df5)
+
+```
+
+#2
+```{r , echo=FALSE}
+var(df0[,1]) #Variance of unrestricted
+var(df0[,4]) #Variance of restricted
+var(df0[,6]) #variance of every day
+
+
+
+```
+
+#####Since X2 does not explain anything  in the model, the variances of the three estimators are very close to each other.
+
+#3
+```{r , echo=FALSE}
+Bias16 <- .16*.7
+Bias24 <- .25*.7
+Bias5 <-  .5*.7
+#Bias of the restricted estimators
+Ealpha16_r <- mean(df16[,4]-0.2)
+Ealpha24_r <- mean(df24[,4]-0.2)
+Ealpha5_r<- mean(df5[,4]-0.2)
+
+#Bias of the unrestricted estimators
+Ealpha16 <- mean(df16[,1]-0.2)
+Ealpha24 <- mean(df24[,1]-0.2)
+Ealpha5 <- mean(df5[,1]-0.2)
+
+#Bias for the every day estimators
+Ealpha16_ed <- mean(df16[,6]-0.2)
+Ealpha24_ed <- mean(df24[,6]-0.2)
+Ealpha5_ed<- mean(df5[,6]-0.2)
+
+
+
+
+
+```
+
+```{r}
+
+
+#The unrestricted model:
+
+Ealpha16
+Ealpha24
+Ealpha5
+
+
+#The unrestricted model:
+
+Ealpha16_r
+Ealpha24_r
+Ealpha5_r
+
+#The everyday model:
+
+Ealpha16_ed
+Ealpha24_ed
+Ealpha5_ed
+
+#The OVB:
+Bias16 
+Bias24 
+Bias5
+
+```
+
+#####In general the unrestricted model gives as expected almost zero bias. The restricted and everyday biases, and are very close to the value that is derived from the omited variable bias formula. 
+
+
+#4
+```{r , echo=FALSE}
+
+#By summing variables =0,1 we get a number of times we reject
+NumAl0 <- sum(df0[,3])
+NumAl0R <- sum(df0[,5])
+NumAl0ED <- sum(df0[,7])
+NumAl16 <- sum(df16[,3])
+NumAl16R <- sum(df16[,5])
+NumAl16ED <- sum(df16[,7])
+NumAl24 <- sum(df24[,3])
+NumAl24R <- sum(df24[,5])
+NumAl24ED <- sum(df24[,7])
+NumAl5 <- sum(df5[,3])
+NumAl5R <- sum(df5[,5])
+NumAl5ED <- sum(df5[,7])
+```
+
+```{r}
+##Unrestricted Model
+NumAl0
+NumAl16
+NumAl24
+NumAl5
+
+##Restricted Model
+
+NumAl0R
+NumAl16R
+NumAl24R
+NumAl5R
+
+##EveryDay Model
+
+NumAl0ED
+NumAl16ED
+NumAl24ED
+NumAl5ED
+
+
+```
+
+#####As expected the number of times that the true value within the CI are very close to each other, no matter how high the beta of X2 was. Under the restricted model and the everyday, the greater the beta, the smaller number of times that the true value was in the CI. The number drops much faster for the restricted model. 
+
+#5
+```{r , echo=FALSE}
+
+library(ggplot2)
+
+dfchunk0 <- split(df0, factor(sort(rank(row.names(df0))%%4)))
+dfN50_B0 <- as.data.frame(dfchunk0["0"])
+dfN100_B0 <- as.data.frame(dfchunk0["1"])
+dfN150_B0 <- as.data.frame(dfchunk0["2"])
+dfN200_B0 <- as.data.frame(dfchunk0["3"])
+
+dfchunk16 <- split(df16, factor(sort(rank(row.names(df16))%%4)))
+dfN50_B16 <- as.data.frame(dfchunk16["0"])
+dfN100_B16 <- as.data.frame(dfchunk16["1"])
+dfN150_B16 <- as.data.frame(dfchunk16["2"])
+dfN200_B16 <- as.data.frame(dfchunk16["3"])
+
+dfchunk24 <- split(df24, factor(sort(rank(row.names(df24))%%4)))
+dfN50_B24 <- as.data.frame(dfchunk24["0"])
+dfN100_B24 <- as.data.frame(dfchunk24["1"])
+dfN150_B24 <- as.data.frame(dfchunk24["2"])
+dfN200_B24 <- as.data.frame(dfchunk24["3"])
+
+dfchunk5 <- split(df5, factor(sort(rank(row.names(df5))%%4)))
+dfN50_B5 <- as.data.frame(dfchunk5["0"])
+dfN100_B5 <- as.data.frame(dfchunk5["1"])
+dfN150_B5 <- as.data.frame(dfchunk5["2"])
+dfN200_B5 <- as.data.frame(dfchunk5["3"])
+
+#Unrestricted Data by sample size and by beta
+stdUn_N50_B0 <- data.frame(x1=50^.5 * (dfN50_B0[,1]-0.2), b=c(0), n=c(50), line=c("Unrestricted"))
+stdUn_N100_B0 <- data.frame(x1=100^.5 * (dfN100_B0[,1]-0.2), b=c(0), n=c(100), line=c("Unrestricted"))
+stdUn_N150_B0 <- data.frame(x1=150^.5 * (dfN150_B0[,1]-0.2),b=c(0), n=c(150), line=c("Unrestricted"))
+stdUn_B200_B0 <- data.frame(x1=200^.5 * (dfN200_B0[,1]-0.2),b=c(0), n=c(200), line=c("Unrestricted"))
+
+stdUn_N50_B16 <- data.frame(x1=50^.5 * (dfN50_B16[,1]-0.2), b=c(0.16), n=c(50), line=c("Unrestricted"))
+stdUn_N100_B16 <-data.frame(x1= 100^.5 * (dfN100_B16[,1]-0.2), b=c(0.16), n=c(100), line=c("Unrestricted"))
+stdUn_N150_B16 <- data.frame(x1=150^.5 * (dfN150_B16[,1]-0.2), b=c(0.16), n=c(150), line=c("Unrestricted"))
+stdUn_B200_B16 <- data.frame(x1=200^.5 * (dfN200_B16[,1]-0.2), b=c(0.16), n=c(200), line=c("Unrestricted"))
+
+stdUn_N50_B24 <- data.frame(x1=50^.5 * (dfN50_B24[,1]-0.2), b=c(0.24), n=c(50), line=c("Unrestricted"))
+stdUn_N100_B24 <-data.frame(x1= 100^.5 * (dfN100_B24[,1]-0.2),b=c(0.24), n=c(100), line=c("Unrestricted"))
+stdUn_N150_B24 <- data.frame(x1=150^.5 * (dfN150_B24[,1]-0.2),b=c(0.24), n=c(150), line=c("Unrestricted"))
+stdUn_B200_B24 <- data.frame(x1=200^.5 * (dfN200_B24[,1]-0.2),b=c(0.24), n=c(200), line=c("Unrestricted"))
+
+stdUn_N50_B5 <- data.frame(x1=50^.5 * (dfN50_B5[,1]-0.2), b=c(0.5), n=c(50), line=c("Unrestricted"))
+stdUn_N100_B5 <- data.frame(x1=100^.5 * (dfN100_B5[,1]-0.2), b=c(0.5), n=c(100), line=c("Unrestricted"))
+stdUn_N150_B5 <- data.frame(x1=150^.5 * (dfN150_B5[,1]-0.2), b=c(0.5), n=c(150), line=c("Unrestricted"))
+stdUn_B200_B5 <- data.frame(x1=200^.5 * (dfN200_B5[,1]-0.2), b=c(0.5), n=c(200), line=c("Unrestricted"))
+
+
+#All unrestricted data combined
+hyperdata_un= rbind(stdUn_N50_B0,stdUn_N100_B0,stdUn_N150_B0,stdUn_B200_B0,
+                    stdUn_N50_B16,stdUn_N100_B16,stdUn_N150_B16,stdUn_B200_B16,
+                    stdUn_N50_B24,stdUn_N100_B24,stdUn_N150_B24,stdUn_B200_B24,
+                    stdUn_N50_B5,stdUn_N100_B5,stdUn_N150_B5,stdUn_B200_B5)
+
+
+
+
+#Restricted Data by sample size and by beta
+stdres_N50_B0 <- data.frame(x1=50^.5 * (dfN50_B0[,4]-0.2), b=c(0), n=c(50), line=c("Restricted"))
+stdres_N100_B0 <- data.frame(x1=100^.5 * (dfN100_B0[,4]-0.2), b=c(0), n=c(100), line=c("Restricted"))
+stdres_N150_B0 <- data.frame(x1=150^.5 * (dfN150_B0[,4]-0.2),b=c(0), n=c(150), line=c("Restricted"))
+stdres_B200_B0 <- data.frame(x1=200^.5 * (dfN200_B0[,4]-0.2),b=c(0), n=c(200), line=c("Restricted"))
+
+stdres_N50_B16 <- data.frame(x1=50^.5 * (dfN50_B16[,4]-0.2), b=c(0.16), n=c(50), line=c("Restricted"))
+stdres_N100_B16 <-data.frame(x1= 100^.5 * (dfN100_B16[,4]-0.2), b=c(0.16), n=c(100), line=c("Restricted"))
+stdres_N150_B16 <- data.frame(x1=150^.5 * (dfN150_B16[,4]-0.2), b=c(0.16), n=c(150), line=c("Restricted"))
+stdres_B200_B16 <- data.frame(x1=200^.5 * (dfN200_B16[,4]-0.2), b=c(0.16), n=c(200), line=c("Restricted"))
+
+stdres_N50_B24 <- data.frame(x1=50^.5 * (dfN50_B24[,4]-0.2), b=c(0.24), n=c(50), line=c("Restricted"))
+stdres_N100_B24 <-data.frame(x1= 100^.5 * (dfN100_B24[,4]-0.2),b=c(0.24), n=c(100), line=c("Restricted"))
+stdres_N150_B24 <- data.frame(x1=150^.5 * (dfN150_B24[,4]-0.2),b=c(0.24), n=c(150), line=c("Restricted"))
+stdres_B200_B24 <- data.frame(x1=200^.5 * (dfN200_B24[,4]-0.2),b=c(0.24), n=c(200), line=c("Restricted"))
+
+stdres_N50_B5 <- data.frame(x1=50^.5 * (dfN50_B5[,4]-0.2), b=c(0.5), n=c(50), line=c("Restricted"))
+stdres_N100_B5 <- data.frame(x1=100^.5 * (dfN100_B5[,4]-0.2), b=c(0.5), n=c(100), line=c("Restricted"))
+stdres_N150_B5 <- data.frame(x1=150^.5 * (dfN150_B5[,4]-0.2), b=c(0.5), n=c(150), line=c("Restricted"))
+stdres_B200_B5 <- data.frame(x1=200^.5 * (dfN200_B5[,4]-0.2), b=c(0.5), n=c(200), line=c("Restricted"))
+
+
+#All Restricted data combined
+hyperdata_res= rbind(stdres_N50_B0,stdres_N100_B0,stdres_N150_B0,stdres_B200_B0,
+                     stdres_N50_B16,stdres_N100_B16,stdres_N150_B16,stdres_B200_B16,
+                     stdres_N50_B24,stdres_N100_B24,stdres_N150_B24,stdres_B200_B24,
+                     stdres_N50_B5,stdres_N100_B5,stdres_N150_B5,stdres_B200_B5)
+
+
+#Every Day
+stded_N50_B0 <- data.frame(x1=50^.5 * (dfN50_B0[,6]-0.2), b=c(0), n=c(50), line=c("Everyday"))
+stded_N100_B0 <- data.frame(x1=100^.5 * (dfN100_B0[,6]-0.2), b=c(0), n=c(100), line=c("Everyday"))
+stded_N150_B0 <- data.frame(x1=150^.5 * (dfN150_B0[,6]-0.2),b=c(0), n=c(150), line=c("Everyday"))
+stded_B200_B0 <- data.frame(x1=200^.5 * (dfN200_B0[,6]-0.2),b=c(0), n=c(200), line=c("Everyday"))
+
+stded_N50_B16 <- data.frame(x1=50^.5 * (dfN50_B16[,6]-0.2), b=c(0.16), n=c(50), line=c("Everyday"))
+stded_N100_B16 <-data.frame(x1= 100^.5 * (dfN100_B16[,6]-0.2), b=c(0.16), n=c(100), line=c("Everyday"))
+stded_N150_B16 <- data.frame(x1=150^.5 * (dfN150_B16[,6]-0.2), b=c(0.16), n=c(150), line=c("Everyday"))
+stded_B200_B16 <- data.frame(x1=200^.5 * (dfN200_B16[,6]-0.2), b=c(0.16), n=c(200), line=c("Everyday"))
+
+stded_N50_B24 <- data.frame(x1=50^.5 * (dfN50_B24[,6]-0.2), b=c(0.24), n=c(50), line=c("Everyday"))
+stded_N100_B24 <-data.frame(x1= 100^.5 * (dfN100_B24[,6]-0.2),b=c(0.24), n=c(100), line=c("Everyday"))
+stded_N150_B24 <- data.frame(x1=150^.5 * (dfN150_B24[,6]-0.2),b=c(0.24), n=c(150), line=c("Everyday"))
+stded_B200_B24 <- data.frame(x1=200^.5 * (dfN200_B24[,6]-0.2),b=c(0.24), n=c(200), line=c("Everyday"))
+
+stded_N50_B5 <- data.frame(x1=50^.5 * (dfN50_B5[,6]-0.2), b=c(0.5), n=c(50), line=c("Everyday"))
+stded_N100_B5 <- data.frame(x1=100^.5 * (dfN100_B5[,6]-0.2), b=c(0.5), n=c(100), line=c("Everyday"))
+stded_N150_B5 <- data.frame(x1=150^.5 * (dfN150_B5[,6]-0.2), b=c(0.5), n=c(150), line=c("Everyday"))
+stded_B200_B5 <- data.frame(x1=200^.5 * (dfN200_B5[,6]-0.2), b=c(0.5), n=c(200), line=c("Everyday"))
+
+```
+
+
+```{r}
+#All Every Day data combined
+hyperdata_ed= rbind(stded_N50_B0,stded_N100_B0,stded_N150_B0,stded_B200_B0,
+                    stded_N50_B16,stded_N100_B16,stded_N150_B16,stded_B200_B16,
+                    stded_N50_B24,stded_N100_B24,stded_N150_B24,stded_B200_B24,
+                    stded_N50_B5,stded_N100_B5,stded_N150_B5,stded_B200_B5)
+
+ggplot(aes(x=x1, fill="Restricted"), data=hyperdata_res)+ 
+  geom_density(alpha=0.5)+
+  facet_grid(n~b)
+
+ggplot(aes(x=x1, fill="Unrestricted"), data=hyperdata_un)+ 
+  geom_density(alpha=0.5)+
+  facet_grid(n~b)
+
+dat2 <- data.frame(rbind(hyperdata_un, hyperdata_res ))
+
+ggplot(aes(x=x1, fill=line), data=dat2)+ 
+  geom_density(alpha=0.5)+
+  facet_grid(n~b)
+```
+
+#####The more X2 explains the variation of Y, the further the distribution of the estimator is from the true value.
+
+#6
+```{r}
+
+#all three estimators
+
+dat1 <- data.frame(rbind(hyperdata_un, hyperdata_res,hyperdata_ed ))
+
+ggplot(aes(x=x1, fill=line), data=dat1)+ 
+  geom_density(alpha=0.5)+
+  facet_grid(n~b)
+
+```
+
+
+

@@ -1,0 +1,203 @@
+---
+title: "Assignment 5 - "
+output:
+  beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Informed guesses on consistency (1)
+
+After running a regression of $y$ on $x_1$ and $x_2$, we test whether the coefficient on $x_2$ is significantly different from $0$. That is:
+
+- $H_o$: $\beta = 0$
+- $H_a$: $\beta \neq 0$
+
+The probability of selecting the true model is $P(|T|\leq c | \beta=0)$ or  $P(|T|> c | \beta \neq 0)$. Let test size $= \gamma$.
+
+When $\beta = 0$, then 
+	\begin{align*} 
+    	\lim_{n\to\infty} Pr(TrueModel) &= Pr(|T|< c | \beta=0)\\
+        		      &= (1- \gamma) \nrightarrow 1
+     \end{align*}
+     
+When $\beta \neq 0$, then 
+	\begin{align*} 
+    	\lim_{n\to\infty} Pr(TrueModel) &= Pr(|T|> c | \beta \neq 0)\\
+        		      &= Test Power  \xrightarrow{\text{p}}  1
+     \end{align*}
+
+Using the definition of test consistency (the latter formulation), the t-test is consistent. 
+
+
+## Informed guesses on consistency (2)
+When $\beta=0$, the true model is $y=\alpha X_1 + e$. There are 2 possibilities.
+
+\begin{enumerate}
+\item T-test accept $\hat{\beta} = 0$, the fitted line is $\hat{y}=\hat{\alpha} X_1+\hat{e}$. $\hat{\alpha}$ is consistent.
+        
+\item T-test reject $\hat{\beta} = 0$, the fitted line is $\hat{y}=\hat{\alpha} X_1+\hat{\beta} X_2 +\hat{e}$. Since $\hat{\beta}\xrightarrow {\text{p}} \beta = 0 $, thus $\hat{\alpha}$ is consistent.
+\end{enumerate}
+         
+When $\beta \neq 0$, the true model is $y=\alpha X_1 + \beta X_2 + e$. From part 1 we showed that when $\beta \neq 0$, the probability of of choosing the true model (Here is $y=\alpha X_1 + \beta X_2 + e$) converges in probability to 1. Thus $\hat{\alpha}$ is consistent. 
+
+
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+library(zoo)
+library(lmtest)
+library(MASS)
+library(Matrix)
+library(broom)
+library(knitr)
+library(stargazer)
+rm(list=ls(all=TRUE))
+library(tidyverse)
+
+sim_n <- 2000
+n <- c(50, 100, 150, 200)
+
+alpha <- 0.2
+beta <- c(0, 0.16, 0.24, 0.5)
+mu <- c(0,0)
+var12 <- 1
+cov12 <- 0.7
+var_matrix <- matrix(var12, nrow = 2, ncol = 2)
+var_matrix[1,2] <- cov12
+var_matrix <- var_matrix %>% forceSymmetric() %>% as.matrix()
+conf_level <- 1 - 0.05
+
+set.seed(135791)
+
+dgp <- function(sample_size, value_beta){
+  sample <- mvrnorm(sample_size, mu, var_matrix) %>% `colnames<-`(c("X1","X2"))
+  y <- alpha * sample[,1] + value_beta * sample[,2] + rnorm(sample_size, 0, 1)
+  sample <- cbind(y, sample) %>% as.data.frame()
+  return(sample)
+}
+
+reg_ur <- function(data_dgp){
+  reg <- lm(y ~ ., data = data_dgp)
+  data <- reg %>% tidy()
+  alpha_est <- data[2,2]
+  alpha_se <- data[2,3]
+  beta_p_value <- data[3,5]
+  is.in.CI <- 0.2 > confint(reg, "X1", conf_level)[,1] & 0.2 < confint(reg, "X1", conf_level)[,2]
+  in.CI <- ifelse(is.in.CI == "TRUE", 1, 0)
+  gathering <- matrix(c(alpha_est, alpha_se, beta_p_value, in.CI), nrow = 1) %>% `colnames<-`(c("UR_alpha_est","UR_alpha_SE","UR_p_value","UR_In_CI_Rate")) %>% as.data.frame()
+  return(gathering)  
+}
+
+reg_r <- function(data_dgp){
+  reg <- lm(y ~ X1, data = data_dgp)
+  data <- reg %>% tidy()
+  alpha_est <- data[2,2]
+  alpha_se <- data[2,3]
+  is.in.CI <- 0.2 > confint(reg, "X1", conf_level)[,1] & 0.2 < confint(reg, "X1", conf_level)[,2]
+  in.CI <- ifelse(is.in.CI == "TRUE", 1, 0)
+  gathering <- matrix(c(alpha_est, alpha_se, in.CI), nrow = 1) %>% `colnames<-`(c("R_alpha_est","R_alpha_SE","R_In_CI_Rate")) %>% as.data.frame()
+  return(gathering)  
+}
+
+sub_sim <- function(data_dgp){
+  result_ur <- reg_ur(data_dgp) %>% as.data.frame()
+  result_r <- reg_r(data_dgp) %>% as.data.frame()
+  Result <- cbind(result_ur, result_r)
+  return(Result)
+}
+
+sim <- function(Sample_size, Beta){
+  sample_data <- dgp(Sample_size, Beta)
+  sim_result <- sub_sim(sample_data)
+  result <- cbind.data.frame(sim_result, Sample_size, Beta)
+  return(result)
+}
+
+case <- expand.grid(n, beta) %>% `colnames<-`(c("n", "beta"))
+
+upper_sim <- function(sim_number){
+  arg_1 <- rep(case[,1], sim_number)
+  arg_2 <- rep(case[,2], sim_number)
+  result <- map2( arg_1, arg_2, ~sim(.x,.y) ) %>% bind_rows() %>% as.data.frame()
+  return(result)
+}
+
+raw_result <- upper_sim(sim_n)
+result_sum <- aggregate(raw_result[1:7], by = list(raw_result$Sample_size, raw_result$Beta), mean)
+names(result_sum)[1] <- "n"
+names(result_sum)[2] <- "beta"
+
+```
+
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+result_with_ev <- mutate(raw_result, E_alpha_est=ifelse(raw_result$UR_p_value<0.05,raw_result$UR_alpha_est,raw_result$R_alpha_est), e_alpha_se=ifelse(raw_result$UR_p_value<0.05,raw_result$UR_alpha_SE,raw_result$R_alpha_SE))
+
+##data frame for beta =0
+result_b0 <- filter(result_with_ev, Beta==0)
+
+
+result_b0_coef <- aggregate(result_b0[,c(1,5,10)], by = list(result_b0$Sample_size), mean) %>% `colnames<-`(c("n","alpha_UR","alpha_R","alpha_E"))
+result_b0_sd <- aggregate(result_b0[,c(1,5,10)], by = list(result_b0$Sample_size), sd) %>% `colnames<-`(c("n","var(UR)","var(R)","var(E)"))
+result_B0 <-cbind(result_b0_coef,result_b0_sd)
+
+##data frame for beta !=0 
+## ```{r, results = 'asis'}
+result_bN0 <- filter(result_with_ev, Beta!=0)
+result_bN0_sum <- aggregate(result_bN0[,c(1,5,10)], by = list(result_bN0$Sample_size, result_bN0$Beta), mean)
+result_bN0_bias <- mutate(result_bN0_sum, bias_UR=result_bN0_sum$UR_alpha_est-0.2, bias_R=result_bN0_sum$R_alpha_est-0.2,bias_E=result_bN0_sum$E_alpha_est-0.2)
+
+
+names(result_bN0_bias)[1] <- "n"
+names(result_bN0_bias)[2] <- "beta"
+
+
+```
+##2. Compare the variance of the three estimators
+```{r, echo = FALSE, warning=FALSE, message=FALSE,results= 'asis'}
+#result_B0
+stargazer(result_B0, summary = F, header = F)
+```
+The variance of the unrestricted estimator is significantly larger than that of the restricted. This is consistent with what we saw in class. 
+When $\beta = 0$, adding additional (useless) variable X2 to the model will increase the variance of the estimator of $\alpha$. 
+The variances of the post-test OLS estimator lie in between the variance of the restricted and the unrestricted ones. 
+
+##3. Compare the bias of the three estimators
+```{r, echo = FALSE, warning=FALSE, message=FALSE,results = 'asis'}
+BIAS=data.frame(n=result_bN0_bias[,1],beta=result_bN0_bias[,2],bias_ur=result_bN0_bias[,6],bias_r=result_bN0_bias[,7],bias_e=result_bN0_bias[,8],bias_omitted=rep(c(0.112,0.168,0.35),times=4))
+stargazer(BIAS, summary = F, header = F)
+```
+The omitted-variable bias is calculated as $E(\hat{\alpha})-\alpha = \beta E(\frac{\sum{X_{1i}X_{2i}}}{\sum{(X_{1i})^2}})$, where $E(\frac{\sum{x_{1i}x_{2i}}}{\sum{x{1i}^2}})$ equals $\frac{cov(X1,X2)}{var(X1)} = 0.7/1=0.7$.
+As is shown in the table, the bias of the restricted estimator is almost the same as the omitted-variable bias. 
+
+##4. Ratio of alpha in the confidence interval
+```{r, echo = FALSE, warning=FALSE, message=FALSE,results = 'asis'}
+CI=data.frame(n=result_sum[,1],beta=result_sum[,2],CI_ratio_ur=result_sum[,6],CI_ratio_r=result_sum[,9])
+stargazer(CI, summary = F, header = F)
+```
+The unrestricted estimators appear in the confidence interval for around 95% of the times in every n~beta case scenario, while the restricted ones appear 95% of the times only when $\beta=0$. In the restricted model, when beta is positive, the average times where alpha is in the confidence interval decrease when beta increases as well as when sample size increases.
+
+
+
+##5. Density plot of standardized distribution
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+library(reshape2)
+result_CLT<-mutate(result_with_ev, clt_UN<-sqrt(result_with_ev$Sample_size)*(result_with_ev$UR_alpha_est-0.2), clt_R<-sqrt(result_with_ev$Sample_size)*(result_with_ev$R_alpha_est-0.2), clt_E<-sqrt(result_with_ev$Sample_size)*(result_with_ev$E_alpha_est-0.2),
+reject<-with(result_with_ev, ave(result_with_ev$UR_p_value, c("result_with_ev$Sample_size","result_with_ev$Beta"), FUN=mean)))
+#dim(result_CLT)
+result_CLT_com<-result_CLT[,c(8,9,12,13,14,15)] %>% `colnames<-`(c("Sample_size","beta","Unrestricted","Restricted","Everyday","Rejection"))
+#result_CLT_com
+result_CLT_com1<-melt(result_CLT_com, id.vars = c("Sample_size","beta"), measure.vars = c("Unrestricted","Restricted","Everyday"))
+
+mutate(result_CLT_com1, Post_Test = ifelse(result_CLT_com1$variable == "Everyday",T,F), alpha_n = result_CLT_com1$value) %>%
+  ggplot(aes(x = alpha_n, fill= Post_Test, linetype = result_CLT_com1$variable)) + labs(linetype = "Estimator") + 
+    geom_density(alpha = I(0.5)) +
+    facet_grid(Sample_size ~ beta) 
+```
+
+##6. Summary: 
+1) Consistency: Consistency holds for the everyday OLS. 
+2) Unbiaseness: When beta is zero, the everyday estimator is unbiased. When beta is nonzero, the bias of the estimator decreases as the sample size increases and as the true beta increases. 
+3) Efficiency: Variance of the everyday estimator gets larger when beta gets larger. 
+
+When the model is correctly specified, the usual OLS distribution well approximates the distribution of the post-test OLS. 

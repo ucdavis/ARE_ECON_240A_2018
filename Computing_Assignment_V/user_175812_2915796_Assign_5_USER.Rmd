@@ -1,0 +1,125 @@
+---
+title: "Assignment 5"
+author: "USER"
+date: "February 20, 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+## Prelim questions
+
+1. consistency of the t-test procedure:  
+1.1. beta=0, not consistent with prob 1-alpha selecting the true model, set alpha=0  
+1.2. beta not equal to 0, consistent with prob 1 selecting the true model  
+  
+2. consistency of the post-test estimator: consistent  
+2.1. beta=0, always consistent no matter which model being selected  
+2.2. beta not equal to 0, consistent since the true model is consistently selected  
+
+
+```{r Simulation}
+rm(list=ls())
+
+library(MASS)
+library(tidyverse)
+library(knitr)
+
+sim.fun = function(n, beta){
+  alpha = 0.2
+  X = data.frame(mvrnorm(n, c(0,0), matrix(c(1,.7,.7,1),nrow = 2)))
+  y = alpha*X[,1] + beta*X[,2] + rnorm(n)
+  lm.fit.full = lm(y~X1+X2, data=data.frame(y,X))
+  lm.fit.r = lm(y~X1, data=data.frame(y,X))
+  alpha.f = summary(lm.fit.full)$coef["X1","Estimate"]
+  alpha.r = summary(lm.fit.r)$coef["X1","Estimate"]
+  beta.pval.f = summary(lm.fit.full)$coef["X2","Pr(>|t|)"]
+  in.CI.f = 0.2>confint(lm.fit.full)["X1",1] & 0.2<confint(lm.fit.full)["X1",2]
+  in.CI.r = 0.2>confint(lm.fit.r)["X1",1] & 0.2<confint(lm.fit.r)["X1",2]
+  if (beta.pval.f<0.05) {
+    alpha.final = alpha.f
+    beta.pval.final = beta.pval.f
+    in.CI.final = in.CI.f
+  } else{
+    alpha.final = alpha.r
+    beta.pval.final = NA
+    in.CI.final = in.CI.r
+  }
+  data.frame(n, beta, Estimator=c("unrestricted","restricted","everyday"),
+             alpha.est = c(alpha.f,alpha.r,alpha.final),
+             beta.pval = c(beta.pval.f, NA, beta.pval.final),
+             in.CI = c(in.CI.f,in.CI.r,in.CI.final))
+}
+
+S = 2000
+ns = c(50, 100, 150, 200)
+betas = c(0, 0.16, 0.24, 0.5)
+params.grid = expand.grid(1:S, n=ns, beta=betas)
+
+set.seed(1234)
+results.df = mapply(sim.fun, params.grid$n, params.grid$beta, SIMPLIFY = F) %>% bind_rows() %>% as_data_frame()
+```
+
+## Table of results
+
+```{r Table 1}
+# Beta=0 #
+kable(spread(filter(results.df, beta==0) %>% group_by(Estimator, n) %>% summarise(var.alpha=var(alpha.est)), Estimator, var.alpha), digits = 3, caption = "Table 1: Variance of alpha_hat for beta=0")
+```
+
+1. As expected, the restricted OLS is more efficient than unrestricted OLS.  
+2. The everyday OLS lies in between (all are unbiased!).  
+
+```{r Table 2}
+# Beta != 0 #
+kable(spread(filter(results.df, beta!=0) %>% group_by(Estimator, beta, n) %>% summarise(bias=mean(alpha.est)-.2) , Estimator, bias), digits =3, caption = "Table 2: Bias of estimates")
+```
+
+1. The unrestricted estimator is almostly unbiased while the other two are biased.  
+2. The bias of the restricted estimator is close to its theoretical value, 0.7*beta.  
+3. The bias of the everyday estimator is less and decreases with larger sample sizes and higher betas. In fact, it is asymptotically unbiased! Two competing factors that affect bias are larger betas that increase bias in the restricted model and lower probability of selecting the biased restricted model with increasing n.
+
+```{r Table 3}
+# In CI #
+kable(spread(results.df %>% group_by(Estimator, beta,n) %>% summarise(in.CI = mean(in.CI)), Estimator, in.CI), digits = 3, caption = "Table 3: Percent in Confidence Interval")
+```
+
+1. The unrestricted CI covers the true alpha with approximately 95%.  
+2. The restricted CI covers the true alpha with approximately 95% when beta=0 but with smaller percentages when beta is farther from 0 due to larger bias.  
+3. The everyday CI covers the true alpha with approximately 95% when beta=0. However, it comes relatively closer to the unrestricted CI coverage with larger sample size and higher beta due to higher prob of the true model being selected.  
+
+## Standardized Distribution
+```{r Plots1, fig.height = 4, fig.width = 10}
+ggplot(aes(x=sqrt(n)*(alpha.est-.2)), data=filter(results.df, Estimator=="unrestricted")) +
+  geom_density() +
+  facet_grid(n~beta) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  ggtitle("unrestricted model")
+ggplot(aes(x=sqrt(n)*(alpha.est-.2)), data=filter(results.df, Estimator=="restricted")) +
+  geom_density() +
+  facet_grid(n~beta) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  ggtitle("restricted model")
+```
+
+1. The asymptotical distributions of the unrestricted models are all centered around zero with normal shapes.  
+2. The asymptotcial distributions of the restricted models are almost normal-shaped (with smaller variances) but only centered around zero when beta=0. The mean shifts away from zero as n and beta increase.
+
+## Distribution (cont.)
+```{r Plots2, fig.height = 6, fig.width = 10}
+reject.beta.rate = filter(results.df, Estimator=="unrestricted") %>% group_by(n, beta) %>% summarise(reject.beta=mean(beta.pval<.05))
+
+ggplot(aes(x=sqrt(n)*(alpha.est-.2), fill=type, linetype=Estimator),
+       data=results.df %>% mutate(type=ifelse(Estimator=="everyday", TRUE, FALSE))) +
+  geom_density(alpha=I(0.5)) +
+  facet_grid(n~beta) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  annotate("text",label= round(reject.beta.rate$reject.beta,2), x=-2, y=0.4)
+```
+
+1. unbiasedness: unbaised when beta=0, biased for other cases but decreasing with larger sample sizes and higher betas, asmptotically unbiased  
+2. t-distribution: not exactly and even highly different  
+3. consistency: yes but convergence speed depends on both beta and sample size  
+4. asmptotical normality: yes but convergence speed depends on both beta and sample size  

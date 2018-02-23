@@ -1,0 +1,184 @@
+---
+title: "PS5 Franciscans"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(latex2exp)
+library(MASS)
+library(reshape2)
+library(dplyr)
+```
+
+
+## Preliminary questions
+1. Note that the power curve is U (or rather, V)- shaped around beta-null, which in this case is 0. Note also that increasing the sample size would "shrink" the horizontal width of the power curve, i.e. the null is more likely to be rejected if the true beta is not zero. A property of consistency is that power approaches to 1 if the true beta is not zero. If The true beta is zero, however, we will reject the null (which happens to be correct) by probability alpha, the critical level, regardless of how large the sample is.
+2. The OLS estimators alpha is also consistent If the true beta is non-zero, then the probability of inclusion of the X2 variable increases as sample increases. If, on the other hand, beta is zero, we falsely reject the null by the probability equal to the critical value. But this does not affect the consistency of alpha, as the potential source of inconsistency is mean zero.
+
+```{r echo=FALSE}
+remove(list = ls())
+
+set.seed(10101)
+
+ols <- function(n, beta){
+  
+  # DGP: errors N(0,1), cov(X1,X2) = 0.7
+  Sigma <- matrix(c(1, .7, .7, 1), nrow=2, ncol = 2)
+  data <- as_data_frame(mvrnorm(n=n, mu=c(0,0), Sigma)) %>% 
+    mutate(eps = rnorm(n=n)) %>% 
+    mutate(Y=0.2*V1 + beta*V2 + eps)  %>% 
+    `colnames<-`(c("X1", "X2", "eps", "Y"))
+  
+  
+  # UR regression: unrestricted, no constant
+  reg1 <- lm(Y~X1 + X2 - 1, data)
+
+    alpha1 <- reg1$coeff[1] 
+    tstat1 <- alpha1/(summary(reg1)$coef[1,2])
+    pval1  <- 2*pt(-abs(tstat1),df=n-2)
+    inCI1  <- as.numeric(0.2>confint(reg1, "X1", level =0.95)["X1",1] &
+                0.2<confint(reg1, "X1", level =0.95)["X1", 2])
+    # also compute stats on beta, which we need for the everyday OLS estimation
+    beta1   <- reg1$coeff[2] 
+    tstatb1 <- beta1/(summary(reg1)$coef[2,2])
+    pvalb1  <- 2*pt(-abs(tstatb1),df=n-2)
+        # is beta1 significant at the 5% level?
+    sigb1   <- as.numeric(pvalb1<.05)
+    inCIB1  <- as.numeric(0>confint(reg1, "X2", level =0.95)["X2",1] & 
+            0<confint(reg1, "X2", level =0.95)["X2", 2])
+ 
+  # R regression: restricted beta=0, no constant
+  reg2 <- lm(Y~X1 - 1, data)
+
+    alpha2 <- reg2$coeff[1] 
+    tstat2 <- alpha2/(summary(reg2)$coef[1,2])
+    pval2  <- 2*pt(-abs(tstat2),df=n-1)
+    inCI2  <- as.numeric(0.2>confint(reg2, "X1", level =0.95)["X1",1] & 
+                0.2<confint(reg2, "X1", level =0.95)["X1", 2])
+   
+   
+  # for each regression, outputs alpha, t stats, p values, and a logical for whether 0.2 is in the 95% CI for alpha 
+  rs <- tibble("beta" = beta, "n" = n, 
+               "alpha_UR" = alpha1, "tstat_UR" = tstat1, "pval_UR" = pval1, "inCI_UR" = inCI1,
+               "alpha_R"  = alpha2, "tstat_R"  = tstat2, "pval_R"  = pval2, "inCI_R"  = inCI2,
+               "sigb1" = sigb1, "inCI_B1" = inCIB1) 
+  return(rs)
+  
+}
+
+
+# simulate 2000 times for each combination of sample size and beta
+# mutate to add post-test 'everyday' OLS: if beta1 was significant use UR, if not use R
+params_gr <- expand.grid(1:2000, n=c(50,100,150, 200), beta=c(0,0.16,0.24,0.5))
+res_gr <- mapply(ols, n =params_gr$n, beta=params_gr$beta, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame() %>% 
+  mutate(alpha_ED = sigb1*alpha_UR + (1-sigb1)*alpha_R, 
+         tstat_ED = sigb1*tstat_UR + (1-sigb1)*tstat_R,
+         pval_ED  = sigb1*pval_UR  + (1-sigb1)*pval_R,
+         inCI_ED  = sigb1*inCI_UR  + (1-sigb1)*inCI_R) 
+```
+
+## 2. Tabulating alpha estimates when $\beta = 0$
+```{r echo=FALSE}
+table2 <- summarise(group_by(res_gr, beta, n), meanUR = mean(alpha_UR), varUR = var(alpha_UR), meanR = mean(alpha_R), varR = var(alpha_R), meanED = mean(alpha_ED), varED = var(alpha_ED))
+
+kable(filter(table2, beta == 0), col.names = c("$\\beta$", "Sample size", "Mean UR","Variance UR", "Mean R","Variance R", "Mean ED", "Variance ED"), digits = 3)
+```
+
+At each sample size, the ED and restricted variance are more efficient than the unrestricted model, as expected. The UR model is misspecified and estimated using the incorrect residuals.
+
+## 3. Tabulating bias when $\beta \neq 0$
+```{r echo=FALSE}
+table3 <- summarise(group_by(res_gr, beta, n), biasUR = mean(alpha_UR) -.2, biasR = mean(alpha_R)-.2, biasED = mean(alpha_ED)-.2)
+
+kable(filter(table3, beta != 0 & n == 200), col.names = c("$\\beta$", "Sample size", "Bias UR","Bias R", "Bias ED"), digits = 3)
+```
+
+## 4.  Bias
+
+The unrestricted model exhibits considerable positive bias. Specifically, when covariates are correlated (here $\rho = 7/10$), imposing the incorrect constraint leads to correlation with the residual term, ensuring mean independence does not hold. It is worth noting that the bias is increasing in the magnitude of the true $\beta$.
+
+The UR estimator, as expected, does not seem to exhibit bias.
+
+The bias of the ED sits between the previous two estimators. In a finite sample setting the possibility of Type II error ensures $\alpha\%$ (in expectation) of the estimated betas are positively biased, and averaging over all estimates (with $(1-\alpha)\%$ unbiased) we obtain an estimate greater than the true value but below the biased unrestricted model.
+
+## 4. Confidence intervals
+```{r echo=FALSE}
+table4 <- summarise(group_by(res_gr, beta, n), inCIUR = mean(inCI_UR), inCIR = mean(inCI_R), inCIED = mean(inCI_ED))
+
+kable(filter(table4, n == 200), col.names = c("$\\beta$", "Sample size", "in CI UR","in CI R", "in CI ED"), caption= "Frequency $\\alpha$ in 95% CI for $\\hat{\\alpha}$", digits = 3)
+```
+
+## 4. Confidence intervals
+
+For the $\beta = 0$ case, all three estimators exhibit similar confidence interval estimates.
+
+When $\beta \neq 0$, the CI frequencies for the UR model tend to be approximately correct, but for the R and ED models we see divergence from the UR model CI estimates, in particular in larger sample sizes. These CI are particularly uninformative; they are at once centered on the wrong location (bias) and use the wrong scale parameter. We can think about this result similarly to overrejection arguments above.
+
+## 5. Density of standardized distibution for unrestricted estimators 
+```{r echo=FALSE}
+# create standardized distribution
+res_gr <- mutate(res_gr, alpha_n_UR = sqrt(n)*(alpha_UR-.2), alpha_n_R = sqrt(n)*(alpha_R-.2), alpha_n_ED = sqrt(n)*(alpha_ED-.2))
+
+# plot for unrestricted estimators
+ggplot(data = res_gr, aes(x=alpha_n_UR)) +
+  geom_density(alpha=I(0.5)) + 
+  facet_grid(beta~n) + 
+  labs(x = TeX('$\\sqrt{n}(\\hat{\\alpha} - 0.2)$'), y = "Sample size")
+
+```
+
+## 5. Density of standardized distibution for restricted estimators 
+```{r echo=FALSE}
+# create standardized distribution
+res_gr <- mutate(res_gr, alpha_n_UR = sqrt(n)*(alpha_UR-.2), alpha_n_R = sqrt(n)*(alpha_R-.2), alpha_n_ED = sqrt(n)*(alpha_ED-.2))
+
+# plot for restricted estimators
+ggplot(data = res_gr, aes(x=alpha_n_R)) +
+  geom_density(alpha=I(0.5)) + 
+  facet_grid(beta~n) + 
+  labs(x = TeX('$\\sqrt{n}(\\hat{\\alpha} - 0.2)$'), y = "Sample size")
+```
+
+## 5. Density of standardized distibution for restricted estimators 
+
+In the unrestricted case we see alpha is consistently estimated so the distributions are centered around zero. In the restricted case, however, when $\beta \neq 0$, the correlation between X_1,X_2 leads to incorrect location of the distribution, ie positive bias.
+
+## 6. All three densities
+
+```{r echo=FALSE}
+ 
+plot <- melt(dplyr::select(res_gr, beta, n, alpha_n_UR, alpha_n_R, alpha_n_ED, inCI_B1), id.vars = c("beta", "n", "inCI_B1"), factorsAsStrings = FALSE) %>%
+  mutate(type=ifelse(variable=="alpha_n_ED", TRUE, FALSE)) 
+  
+t_test_mean = summarise(group_by(plot, beta, n), t_test_mean= mean(inCI_B1))
+
+ggplot(plot, aes(x=value, fill=type, linetype=variable)) +
+  geom_density(alpha=I(0.5)) + 
+  facet_grid(beta~n) + 
+  labs(x = TeX('$\\sqrt{n}(\\hat{\\alpha} - 0.2)$'), y = "Sample size") + 
+  scale_fill_discrete(name  ="Estimator type",
+    labels=c("OLS", "Post-selection OLS")) +
+  scale_linetype_discrete(name  ="Estimator",
+    labels=c("Unrestricted", "Restricted", "Post-selection")) +
+  annotate("text", label=t_test_mean$t_test_mean, x=-2, y=0.4)
+
+```
+
+## 6. Summarizing the three densities
+
+Unbiasedness: we see that the alpha estimators are unbiased when beta = 0, as discussed above. If beta is nonzero, our density plots show significant differences between the restricted and unrestricted (unbiased) cases. The everyday estimators are also biased because of the type II errors. 
+
+Consistency: We see that when beta is non-zero, the restricted estimators are inconsistent due to the positive correlation between X1 and X2. The everyday estimator is consistent because the frequency of the type II error converges to zero. 
+
+Efficiency: The restricted estimator is more efficient, although it is biased and inconsistent in cases where beta is nonzero. Since the everyday estimator adopts the restricted model more frequently, it is more efficient than the unrestricted model when beta is zero (i.e. unbiased). If beta is non zero, however, it is unclear if the everyday estimator is more efficient, because of the bimodal distribution. 
+
+
+
+
+

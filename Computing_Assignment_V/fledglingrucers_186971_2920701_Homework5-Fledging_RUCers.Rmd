@@ -1,0 +1,111 @@
+---
+title: "Assignment5"
+author: "Fledging RUCers"
+date: "2018/2/22"
+output: ioslides_presentation
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(broom)
+library(MASS)
+library(purrr)
+set.seed(2018)
+simu=function(beta,n){
+  e=rnorm(n)
+  x=mvrnorm(n,mu=c(0,0),Sigma=matrix(c(1,0.7,0.7,1),nrow=2))
+  y=x%*%matrix(c(0.2,beta),nrow=2)+e
+  reg_restrict=data.frame(type=c("restrict"))%>%
+    cbind(tidy(lm(y~0+x[,1])))
+  reg_restrict$term=c("x1")
+  reg_unrestrict=data.frame(type=c("unrestrict","unrestrict"))%>%
+    cbind(tidy(lm(y~0+x)))
+  t=reg_unrestrict%>%
+    filter(term=="x2")
+  reg_unrestrict=reg_unrestrict%>%
+    filter(term=="x1")
+  if(abs(t$statistic)>1.96){
+    everyday=reg_unrestrict
+    everyday$type=c("everyday")
+  }
+  else{
+    everyday=reg_restrict
+    everyday$type=c("everyday")
+  }
+  reg=bind_rows(reg_restrict,reg_unrestrict,everyday,.id=NULL)
+  return(reg)
+}
+
+S <- 2000
+beta=c(rep(0, S),rep(0.16, S),rep(0.24, S),rep(0.5, S))
+n=c(50,100,150,200)
+input=expand.grid(n,beta)
+colnames(input)=c("n","beta")
+res=mutate(input,res=map2(input$beta,input$n,~simu(beta=.x,n=.y)%>%bind_rows))%>%
+  unnest(res)
+```
+
+##2
+variance:
+```{r, echo = FALSE}
+var=res%>%
+  filter(beta==0)%>%
+  group_by(n,beta,type,term)%>%
+  summarise(std.error=mean(std.error))
+var
+```
+
+##3
+bias:
+```{r, echo = FALSE}
+bias=res%>%
+  filter(beta!=0)%>%
+  group_by(n,beta,type,term)%>%
+  summarise(bias=mean(estimate-0.2))
+bias%>%
+  filter(n==200)
+```
+
+##4
+average times:
+```{r, echo = FALSE}
+t=res%>%
+  mutate(t=(estimate-0.2)/std.error)
+times=t%>%
+  filter(abs(t)<1.96)%>%
+  group_by(n,beta,type,term)%>%
+  summarise(times=length(t)/2000)
+times%>%
+  filter(n==200)
+```
+
+##5.1
+```{r, echo = FALSE}
+res %>%
+  filter(type=="restrict") %>%
+  ggplot()+
+  geom_density(aes(x=sqrt(n)*(estimate-0.2), fill=as.factor(n)))+
+  facet_grid(n~beta)+
+  xlab(expression(sqrt(n)(hat(alpha)-0.2)))+
+  labs(title="restrict")
+```
+
+##5.2
+```{r, echo = FALSE}
+ggplot(data=res%>%filter(type=="unrestrict"))+
+  geom_density(aes(x=sqrt(n)*(estimate-0.2), fill=n))+
+  facet_grid(n~beta)+
+  xlab(expression(sqrt(n)(hat(alpha)-0.2)))+
+  labs(title="unrestrict")
+```
+
+## 6
+```{r echo=FALSE}
+mutate(res,post_test=ifelse(res$type=="everyday", TRUE, FALSE))%>%
+  ggplot(aes(x=sqrt(n)*(estimate-0.2), fill=post_test, linetype=type))+
+  geom_density(alpha=I(0.5))+
+  facet_grid(n~beta)+
+  xlab(expression(sqrt(n)(hat(alpha)-0.2)))
+```
+
