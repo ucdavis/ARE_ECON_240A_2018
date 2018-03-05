@@ -1,0 +1,147 @@
+---
+title: "Assignment 6"
+author: "Surplus Value"
+date: "3/1/2018"
+output: slidy_presentation
+---
+
+
+```{r}
+library(magrittr)
+library(dplyr)
+library(MASS)
+library(purrr)
+library(tidyverse)
+library(ggplot2)
+library(pwr)
+library(PASWR)
+```
+
+```{r, echo=FALSE}
+sd=1
+simul <- function(n=n, mu=mu) {
+  x <- rnorm(n, mean=mu, sd=sd) 
+  xbar <-mean(x)
+  t <- (xbar-0)/(sd/sqrt(n))
+  ifelse(abs(t)>1.96,1,0)
+}
+
+S <- 100 #Number of samples
+params_gr <-expand.grid(n=(2:30)^2,  mu=(-15:15)/6) %>% as.tbl#Expanding our simulation for each S, each n and each mu
+res_gr <-mapply(simul, n=params_gr$n, mu=params_gr$mu, SIMPLIFY = TRUE)
+sim_df <- params_gr %>% 
+  mutate(power=map2_dbl(n,mu,~rerun(S,simul(n=.x,mu=.y)) %>%
+                          unlist%>%
+                          mean))
+
+sim_df=cbind(sim_df, type=rep("simulation", 899))
+
+power_analytical <- function(mu=mu, n=n){
+  c1<-qnorm(0.05,mu,1/sqrt(n))
+  c2<-qnorm(0.95,mu,1/sqrt(n))
+  mu_a = seq(-3+mu, 3+mu, 0.01)
+  power<-pnorm(c1,mu_a,1/sqrt(n))+1-pnorm(c2,mu_a,1/sqrt(n))
+  final_analytical <- data.frame(cbind("power" = power, "mu" = mu_a, "mean" = mu, "n" = n))
+  return(final_analytical)
+}
+
+
+```
+
+
+
+
+
+
+
+
+#####HeatMap
+```{r, echo=FALSE}
+ggplot(sim_df, aes(x=factor(mu), y=factor(n)))+
+  geom_tile(aes(fill=power),colour = "white") + 
+  scale_fill_gradient(low = "white",high = "steelblue")
+
+```
+
+
+#####Simulation Plot
+
+```{r, echo=FALSE}
+
+
+Ndata <- subset(sim_df, n %in% c(25, 100, 400, 900))
+
+ggplot(Ndata, aes(x=mu, y=power, colour=factor(n)))+
+  geom_line()
+
+```
+
+
+#####Analytical Plot
+
+```{r, echo=FALSE}
+
+graph_num2 <- rbind(power_analytical(0,25), power_analytical(0,100),power_analytical(0,400),power_analytical(0,900))
+
+graph_num2 <- graph_num2[, -3]
+graph_num3= cbind(graph_num2, type=rep("analytical", 2404))
+
+ggplot(graph_num2, aes(x = mu,y =  power, colour = factor(n))) + geom_line()
+
+
+
+```
+
+
+
+
+#####Analytical vs Simulation 1
+
+```{r, echo=FALSE}
+
+a=graph_num3[graph_num3$n==25,]
+b=Ndata[Ndata$n==25,]
+ab=rbind(a,b)
+ggplot(ab, aes(x = mu,y =  power, colour = type)) + 
+  geom_line()
+
+
+```
+
+
+#####Analytical vs Simulation 2
+```{r, echo=FALSE}
+
+a=graph_num3[graph_num3$n==25 | graph_num3$n==100 | graph_num3$n==400 | graph_num3$n==900,]
+b=Ndata[Ndata$n==25,]
+ab=rbind(a,b)
+graph_num4 <- rbind(Ndata,a)
+
+
+ggplot(aes(x=mu, y = power), data=graph_num4)+ 
+  geom_line(alpha=0.5)+
+  facet_grid(n~type)
+
+```
+
+
+
+#####Simulation Graph for different mu
+
+
+```{r, echo=FALSE}
+
+
+Mudata <- subset(sim_df, mu %in% c(-.5, 0, 0.5))
+
+ggplot(Mudata, aes(x=n, y=power, colour=factor(mu)))+
+  geom_line() 
+
+```
+
+#####Question 5 
+######When the sample size is 500 and the difference to be detected is 1; the power is 100%. For 90% power,  a sample size of 21 is sufficient.
+
+
+
+

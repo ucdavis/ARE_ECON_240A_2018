@@ -1,0 +1,86 @@
+---
+title: "Assignment 6"
+author: "OZONE"
+date: "February 28, 2018"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(broom)
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+```
+
+## Analytical Results
+
+The power of a test is the probability of rejecting null hypothesis when the null is false. Hence, given $\mu$ and sample size, we could calculate this probability.
+$$\begin{aligned}
+power =& Pr(reject\ H_0|H_0\ not\ true)\\
+=& Pr(\frac{\bar{x}-0}{\sqrt{\frac{1}{n}}}>c|\mu=\mu^{*}) + Pr(\frac{\bar{x}-0}{\sqrt{\frac{1}{n}}}<-c|\mu=\mu^{*})\\
+=& Pr(\frac{\bar{x}-\mu^{*}}{\sqrt{\frac{1}{n}}}>\frac{c\sqrt{\frac{1}{n}}-\mu^{*}}{\sqrt{\frac{1}{n}}}|\mu=\mu^{*}) + \\
+&Pr(\frac{\bar{x}-\mu^{*}}{\sqrt{\frac{1}{n}}}<\frac{-c\sqrt{\frac{1}{n}}-\mu^{*}}{\sqrt{\frac{1}{n}}}|\mu=\mu^{*})\\
+=& 1-\Phi(c-\frac{\mu^*}{\sqrt{\frac{1}{n}}}) + \Phi(-c-\frac{\mu^*}{\sqrt{\frac{1}{n}}})
+\end{aligned}$$
+
+
+```{r simulation results}
+set.seed(123)
+sim_dat=function(n=10,u=0){
+ dat=data.frame(x=rnorm(n,u,1))
+ result=data.frame( z  = mean(dat$x)/sqrt(1/n)) %>%
+ mutate(test= ifelse (z < qnorm(.025) | z > qnorm(0.975), 1, 0)) #1=reject;0=not reject
+ return(result)
+}
+
+grid=expand.grid(n=(2:31)^2, u=seq(-1,1,by=2/29))%>%
+  mutate(test=map2(n,u,~rerun(100,sim_dat(n=.x,u=.y))%>% bind_rows))%>%
+  unnest(test)
+Rejection= grid %>% group_by(n,u)%>% summarise(ave_prob=mean(test))
+
+```
+
+##Question 1
+```{r}
+ggplot(aes(factor(n),u),data=Rejection)+
+  geom_tile(aes(fill=ave_prob))
+```
+
+##Question 2
+```{r}
+Rejection = Rejection %>% mutate(any = 1- pnorm(qnorm(0.975)-sqrt(n)*u) + pnorm(qnorm(0.025) - sqrt(n)*u))
+Rejection %>% filter(n %in% c(9,36,121,400)) %>%
+  ggplot(aes(colour = factor(n))) +
+  geom_point(aes(x=u,y=ave_prob)) +
+  geom_line(aes(x=u,y=any)) 
+```
+- Note: Dots are simulated data. Lines are analytical curves.
+
+##Question3
+```{r}
+Rejection %>% filter(u %in% seq(-1,1,by = 2/29)[c(16:20)]) %>%
+ggplot(aes(colour = factor(u))) +
+  geom_point(aes(x=n,y=ave_prob)) +
+  geom_line(aes(x=n,y=any)) 
+```
+- Note: Dots are simulated data. Lines are analytical curves.
+
+##Question5
+- When n=500, I expect to detect a difference of 1 in my outcome variable with almost 100% confidence.
+- When the sample size is 11, we could detect a difference of 1 with 90% confidence.
+```{r}
+n=500
+myfunction = function(n,u=1){
+  return(1- pnorm(qnorm(0.975)-sqrt(n)*u) + pnorm(qnorm(0.025) - sqrt(n)*u))
+}
+myfunction(n=n)
+df = data.frame(n = 1:500)
+df$power = myfunction(n = df$n)
+df$nstar = abs(df$power - 0.9)
+which(df$nstar == min(df$nstar))
+```
+
+
+
+

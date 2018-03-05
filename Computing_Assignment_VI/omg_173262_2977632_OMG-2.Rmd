@@ -1,0 +1,252 @@
+---
+title: "Computing Assignment VI"
+author: "OMG"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Analytical results: Power
+
+The power is one minus the probability of a type II error.
+
+$\pi(\beta) = Pr(Reject H_0|H_1 = true) = Pr(|t|>c|\mu)$  
+
+$=Pr(t>c|\mu)+Pr(t<-c|\mu)$
+
+$=1-Pr(\frac{\bar x}{\frac{1}{\sqrt n}}<c|\mu) + Pr(\frac{\bar x}{\frac{1}{\sqrt n}}<-c|\mu)$
+
+$=1-\phi(\frac{c*\frac{1}{\sqrt n}-\mu}{\sqrt\frac{1}{n}}) + \phi(\frac{-c*\frac{1}{\sqrt n}-\mu}{\sqrt\frac{1}{n}})$
+
+$=1-\phi({c-\mu*\sqrt n}) + \phi({-c-\mu*\sqrt n})$
+
+##Heatmap of Rejection Rates
+
+```{r, include=FALSE}
+library(knitr)
+library(tidyverse)
+library(dplyr)
+library(gridExtra)
+library(kableExtra)
+#estimate beta of the linear projection model
+
+simulate<-function (simul,n,mu){
+  X <- rnorm(n=n)+mu
+  mu_o=0
+  crit_x_left=qnorm(0.025, mean = 0, sd = 1, lower.tail = TRUE)*sqrt(1/n)+ mu_o
+  crit_x_right=-qnorm(0.025, mean = 0, sd = 1, lower.tail = TRUE)*sqrt(1/n)+ mu_o
+  x_hat=mean(X)
+  reject=0
+  if ( (x_hat>crit_x_right) | (x_hat<crit_x_left)){
+  reject=1
+  }
+  
+  dfout=data.frame(simul=simul, n=n, mu=mu, xhat=x_hat,left=crit_x_left, right=crit_x_right, reject=reject )
+  
+  return(dfout)
+  
+}
+
+#generate grid
+S <- 100
+n_pow <- (6:35)^2
+mus=c(seq(from = -0.47, to = 0.47, by = 0.94/30))
+mus_select=sample(mus,4,replace=F)
+
+
+params_gr <- expand.grid(1:S, size=n_pow, betas=mus)
+res_gr <- mapply(simulate, simul=1:S ,n=params_gr$size, mu=params_gr$betas, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+
+stats_coef <- res_gr %>%
+  group_by(mu,n) %>%
+  mutate(power=pnorm((right-mu)*sqrt(n),lower.tail = FALSE)+pnorm((left-mu)*sqrt(n))) %>%
+  #mutate(power=1-pnorm((-qnorm(0.025)-mu)*sqrt(n))+pnorm((qnorm(0.025)-mu)*sqrt(n))) %>%
+  summarise(rrate=mean(reject), power_theo=mean(power)) 
+
+kable(stats_coef, digits = 3, caption = "Table 1: OLS Estimates")
+
+# heatmap
+PlotA <- ggplot(stats_coef,aes(x=factor(mu), y=factor(n), fill=rrate))+
+  geom_tile()+xlab("mu")+ylab("n")+labs(fill="Rejection rate")+
+  scale_x_discrete(labels = function(x) round(as.numeric(x), digits=2))+
+  scale_fill_continuous(guide = guide_legend(title="Average_reject",title.postion = "bottom"))+
+  theme(axis.text.x=element_text(color=c("black","transparent","transparent","transparent","transparent")))
+
+PlotB <- ggplot(stats_coef,aes(x=factor(mu), y=factor(n), fill=power_theo))+
+  geom_tile()+xlab("mu")+ylab("n")+labs(fill="Power")+
+  scale_x_discrete(labels = function(x) round(as.numeric(x), digits=2))+
+  scale_fill_continuous(guide = guide_legend(title="Analytical Power",title.postion = "bottom"))+
+  theme(axis.text.x=element_text(color=c("black","transparent","transparent","transparent","transparent")))
+```
+
+```{r}
+grid.arrange(PlotA, PlotB, nrow = 1)
+```
+
+The rejection rates closely mirror the power, as expected.
+
+##Power Curves by n
+
+```{r}
+#2. Pick a few n values
+stats_coef <- res_gr %>%
+  group_by(mu,n) %>%
+  mutate(power=pnorm((right-mu)*sqrt(n),lower.tail = FALSE)+pnorm((left-mu)*sqrt(n))) %>%
+  #mutate(power=2-pnorm((-qnorm(0.025)-mu)*sqrt(n))-pnorm((-qnorm(0.025)+mu)*sqrt(n))) %>%
+  filter(n==c(49,196,256,729,1225)) %>%
+  summarise(rrate=mean(reject),power_theo=mean(power)) 
+  
+PlotC <- ggplot(stats_coef)+
+  geom_point(aes(x=mu,y=rrate,colour=factor(n)))+
+  geom_line(aes(x=mu,y=power_theo,colour=factor(n)))+
+  xlab("mu")+ylab("rejection rate")+labs(colour="Analytical power by n")
+plot(PlotC)
+```
+
+As n increases, we see the power curve improving so that for the same $\mu$ we now have a higher power.
+
+##Power curves by mu
+
+```{r}
+#3. Pick a few mu values
+
+stats_coef <- res_gr %>%
+  filter(mu==mus_select) %>%
+  mutate(mu=round(mu, digits = 2))%>%
+  group_by(mu,n) %>%
+  mutate(power=pnorm((right-mu)*sqrt(n),lower.tail = FALSE)+pnorm((left-mu)*sqrt(n))) %>%
+  #mutate(power=2-pnorm((-qnorm(0.025)-mu)*sqrt(n))-pnorm((-qnorm(0.025)+mu)*sqrt(n))) %>%
+  summarise(rrate=mean(reject),power_theo=mean(power)) 
+
+PlotD <- ggplot(stats_coef)+
+  geom_point(aes(x=n,y=rrate,colour=factor(mu)))+
+  geom_line(aes(x=n,y=power_theo,colour=factor(mu)))+
+  xlab("n")+ylab("rejection rate")+labs(colour="Analytial power by mu")
+plot(PlotD)
+```
+
+The rejection rate, and the power, increases as n increases.  This happens faster for $\mu$ further from 0.
+
+## Student questions
+When $H_0:\mu=0$, $\mu=1$, and $n=500$, the power is 1.  
+For $\mu=1$, we would need $n=11$ for a power of 0.90.  
+
+```{r, include=FALSE}
+
+#quest 5 [part a]
+mu_o=0
+x_left=qnorm(0.025, mean = 0, sd = 1, lower.tail = TRUE)*sqrt(1/500)+ mu_o
+x_right=-qnorm(0.025, mean = 0, sd = 1, lower.tail = TRUE)*sqrt(1/500)+ mu_o
+power=pnorm((x_right-1)*sqrt(500),lower.tail = FALSE)+pnorm((x_left-1)*sqrt(500))
+
+#quest 5 [part b]
+simulate2<-function (simul,n,mu){
+  X <- rnorm(n=n)+mu
+  mu_o=0
+  crit_x_left=qnorm(0.025, mean = 0, sd = 1, lower.tail = TRUE)*sqrt(1/n)+ mu_o
+  crit_x_right=-qnorm(0.025, mean = 0, sd = 1, lower.tail = TRUE)*sqrt(1/n)+ mu_o
+  x_hat=mean(X)
+  reject=0
+  if ( (x_hat>crit_x_right) | (x_hat<crit_x_left)){
+    reject=1
+  }
+  
+  dfout=data.frame(simul=simul, n=n, mu=mu, xhat=x_hat,left=crit_x_left, right=crit_x_right, reject=reject )
+  
+  return(dfout)
+  
+}
+
+
+S <- 100
+res_gr2 <- mapply(simulate2, simul=1:S ,n=c(5:15), mu=1, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+```
+
+```{r, message=FALSE, warning=FALSE}
+stats_coef2 <- res_gr2 %>%
+  group_by(mu,n) %>%
+  mutate(power=pnorm((right-mu)*sqrt(n),lower.tail = FALSE)+pnorm((left-mu)*sqrt(n))) %>%
+  #mutate(power=2-pnorm((-qnorm(0.025)-mu)*sqrt(n))-pnorm((-qnorm(0.025)+mu)*sqrt(n))) %>%
+  summarise(rrate=mean(reject), power_theo=mean(power)) 
+
+kable(stats_coef2, digits = 3, caption = "Table 1: power table", format = "html")%>%
+  kable_styling(font_size = 22)%>%
+  column_spec(2, width = "2em")%>%
+  column_spec(3, width = "4em")
+
+```
+
+## The Turtle and the Hare: Logic
+
+$$t = \frac{\bar x-\mu_o}{\frac{1}{\sqrt n}} = \frac{\bar x-\mu_a}{\frac{1}{\sqrt n}} + \frac{\mu_a -\mu_o}{\frac{1}{\sqrt n}} \xrightarrow[]{d} ~N(0,1)+\frac{\mu_a}{\frac{1}{\sqrt n}}$$ 
+
+For the good student, $\frac{\mu_a}{\frac{1}{\sqrt n}} = \frac{\frac{2}{\sqrt n}}{\frac{1}{\sqrt n}} = 2$
+
+For the hare, $\frac{\mu_a}{\frac{1}{\sqrt n}} = \frac{\frac{2}{n^{0.6}}}{\frac{1}{\sqrt n}} = \frac{2}{n^{0.1}} \xrightarrow[]{p} 0$
+
+For the turtle, $\frac{\mu_a}{\frac{1}{\sqrt n}} = \frac{\frac{2}{n^{0.4}}}{\frac{1}{\sqrt n}} = 2*n^{0.1} \xrightarrow[]{p} \infty$
+
+## The Turtle and the Hare
+
+```{r}
+#OPTIONAL
+###good student
+#mu=0+2/(n^0.5)
+###turtle
+#mu=0+2/(n^0.4)
+###rabbit
+#mu=0+2/(n^0.6)
+
+sim_fo<-function (n,mu){
+  X <- rnorm(n=n)+mu
+  mu_o=0
+  crit_x_left=qnorm(0.025, mean = 0, sd = 1, lower.tail = TRUE)*sqrt(1/n)+ mu_o
+  crit_x_right=-qnorm(0.025, mean = 0, sd = 1, lower.tail = TRUE)*sqrt(1/n)+ mu_o
+  x_hat=mean(X)
+  reject=0
+  if ( (x_hat>crit_x_right) | (x_hat<crit_x_left)){
+    reject=1
+  }
+  
+  dfout=reject
+  
+  return(dfout)
+  
+}
+n_pow <- (2:30)^2
+pows_df <- data_frame(Type= c("Turtle", "Good student", "Rabbit"),
+                      power=c(0.4, 0.5, 0.6)) %>%
+  mutate(mu = map(power, ~data_frame(n=n_pow, mu=2/n_pow^.))) %>%
+  unnest(mu)
+
+pows_sims <- pows_df %>%
+  mutate(reject=map2_dbl(n, mu, ~rerun(100, sim_fo(n=.x, mu=.y)) %>% unlist %>% mean ))
+
+library(png)
+library(grid)
+library(gridExtra)
+library(jpeg)
+## function readPNG() does not accept an URL, so we need to download first:
+temp_file <- tempfile()
+download.file("http://moziru.com/images/bunny-clipart-vector-8.png", destfile = temp_file)
+# if it doesnt work, try one of:
+download.file("http://moziru.com/images/bunny-clipart-vector-8.png", destfile = temp_file, mode="wb")
+#download.file("http://moziru.com/images/bunny-clipart-vector-8.png", destfile = temp_file, method="wget")
+img <- readPNG(temp_file)
+temp_file2<-tempfile()
+download.file("https://www.usmagazine.com/wp-content/uploads/finding-dory-baby-turtle-bc12b198-fefc-44d6-8be5-07ddcef85b04.jpg", destfile = temp_file2,mode="wb")
+img2 <- readJPEG(temp_file2)
+## How to add a rabbit on an empty plot (geom_blank())
+
+ggplot(pows_sims, aes(x=n,y=reject,colour=Type)) +
+  geom_point()+
+  annotation_custom(rasterGrob(img), xmin=750, xmax= 900, ymin=0.2, ymax=0.3)+
+  annotation_custom(rasterGrob(img2), xmin=750, xmax= 900, ymin=0.85, ymax=0.95)
+```
+

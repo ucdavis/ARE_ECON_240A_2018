@@ -1,0 +1,131 @@
+---
+title: "Assignment 6"
+author: "USER"
+date: "February 25, 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+## Analytical Results
+Since
+$$\bar{X}=\frac{1}{n}\sum_{i=1}^{n}X_i \sim N(\mu,\frac{1}{n})$$
+the power function is
+$$\beta(\alpha,\mu)=Pr\{|\frac{\bar{X}-0}{\sqrt{\frac{1}{n}}}|>C_{\alpha/2}|\mu\}=1-Pr\{|\frac{\bar{X}}{\sqrt{\frac{1}{n}}}|\leq C_{\alpha/2}|\mu\}=1-Pr\{-C_{\alpha/2} \sqrt{\frac{1}{n}} \leq \bar{X} \leq C_{\alpha/2} \sqrt{\frac{1}{n}}|\mu\}$$
+That is
+$$\beta(\alpha,\mu)=1-Pr\{-C_{\alpha/2}-\sqrt{n}\mu \leq \frac{\bar{X}-\mu}{\sqrt{\frac{1}{n}}} \leq C_{\alpha/2}-\sqrt{n}\mu | \mu\}=\phi(\sqrt{n}\mu-C_{\alpha/2}) + \phi(-\sqrt{n}\mu-C_{\alpha/2})$$
+which is strictly increasing w.r.t. $|\sqrt{n}\mu|$.
+
+## Simulation Results 1
+From the graph below, we see that power increases with n and $|\mu|$. When mu is 0, power is invariant with respect to n and is equal to $\alpha$. This is compatible with our theoretical result.
+```{r Power Simulation}
+library(tidyverse)
+rm(list=ls())
+
+power.rej = function(mu, n) {
+  x = rnorm(n, mean=mu, sd=1)
+  abs(mean(x)/(1/sqrt(n)))>1.96 # H0: mu=0, variance is known as 1/n and alpha=0.05.
+}
+power.sim = function(S, mu, n) mean(replicate(S, power.rej(mu, n)))
+
+power.comp = function(mu, n) pnorm(qnorm(.025, mean=0, sd=1/sqrt(n), lower.tail = T), mean=mu, sd=1/sqrt(n), lower.tail=T) + 
+  pnorm(qnorm(.025, mean=0, sd=1/sqrt(n), lower.tail = F), mean=mu, sd=1/sqrt(n), lower.tail=F) # the critical value is based on H0.
+
+ns = round(5*1.25^(0:34),0) # 35 ns
+mus = sort(c(-signif(.05*1.35^(0:15),2),0,signif(.05*1.35^(0:15),2))) # 33 mus
+params.grid = expand.grid(mu=mus, n=ns)
+
+set.seed(1234)
+results.df = data.frame(params.grid,
+                        power.sim = mapply(power.sim, 100, params.grid$mu, params.grid$n, SIMPLIFY = T),
+                        power.true = round(mapply(power.comp, params.grid$mu, params.grid$n, SIMPLIFY = T),2)
+                        )
+results.df$mu.factor = factor(results.df$mu)
+results.df$n.factor = factor(results.df$n)
+```
+
+
+```{r Chart 1, fig.height = 5, fig.width = 10}
+# Power by mu and N
+ggplot(data=results.df, aes(x=mu.factor, y=n.factor)) + geom_tile(aes(fill = power.sim)) +
+  scale_fill_gradient(low = "lightblue",high = "darkblue")
+```
+
+## Simulation Results 2
+For the left plot, for a fixed n, power increases with size of mu. The rate of power convergence to 1 is faster with larger n.
+For the right plot, for a fixed mu, power increases with n. The rate of power convergence to 1 is faster for larger mu.
+```{r Chart 2, fig.height = 4, fig.width = 12}
+library(gridExtra)
+p1 = ggplot(filter(results.df, n %in% c(30,114,434,1654)), aes(x=mu, group=n, color=n)) +
+  geom_line(aes(y=power.sim)) +
+  geom_line(aes(y=power.true), linetype = "dashed") +
+  scale_colour_gradient(low = "lightblue",high = "black") +
+  coord_cartesian(xlim = c(-1, 1))
+
+p2 = ggplot(filter(results.df, mu %in% c(.05, .12, .22, .41)), aes(x=n, group=mu, color=mu)) +
+  geom_line(aes(y=power.sim)) +
+  geom_line(aes(y=power.true), linetype = "dashed") +
+  scale_colour_gradient(low = "lightblue",high = "black") +
+  coord_cartesian(xlim = c(0, 500))
+grid.arrange(p1, p2, ncol=2)
+```
+
+
+## Finding n
+Based on the previously derived power function, we use the uniroot function to find the n given a specific power.
+```{r Power calc, echo=T}
+power=function(x){
+  c=qnorm(0.05/2,mean=0,sd=1, lower.tail=F) # alpha=0.05
+  pnorm(x-c,mean=0,sd=1,lower.tail = T) + pnorm (-x-c,mean=0,sd=1,lower.tail = T)
+}
+inverse=function(p) uniroot(function(x) power(x)-p, lower=0, upper=10^6)$root
+find.n=function(mu,p) ceiling((inverse(p)/mu)^2)
+```
+
+```{r Power calc examples, echo=T}
+find.n(1,0.8)
+find.n(1,0.9)
+```
+
+##Local power: theretical discussion
+Since
+$$\beta(\alpha,\mu)=\phi(\sqrt{n}\mu-C_{\alpha/2}) + \phi(-\sqrt{n}\mu-C_{\alpha/2})$$
+we have:    
+1. good student  
+$$\mu=2/\sqrt{n} \implies \beta(\alpha,\mu)=\phi(2-C_{\alpha/2}) + \phi(-2-C_{\alpha/2})$$
+which is a constant and a little bit above $0.5$ if $\alpha=0.05$.  
+2. turtle  
+$$\mu=2/n^{0.4} \implies \beta(\alpha,\mu)=\phi(2n^{0.1}-C_{\alpha/2}) + \phi(-2n^{0.1}-C_{\alpha/2})$$
+which is strictly increasing w.r.t. $n$ and converges to $1$.  
+3. rabbit  
+$$\mu=2/n^{0.6} \implies \beta(\alpha,\mu)=\phi(2/n^{0.1}-C_{\alpha/2}) + \phi(-2/n^{0.1}-C_{\alpha/2})$$
+which is strictly decreasing w.r.t. $n$ and converges to $\alpha$, say $0.05$.  
+Back to our post test estimator $\tilde{\beta}$, it is still consistent but its asymptotic distribution doesn't converge to the distribution of the unrestricted OLS estimator. In fact, it is a mix when $n$ goes to infinity given that the power of the post test converges to $\alpha \in (0,1)$.
+
+##Local power: graph respresentation
+The graph below is expected based on the previous theoretical derivations.
+```{r chart 4, fig.height = 4, fig.width = 8}
+library(png)
+library(grid)
+library(gridExtra)
+
+n_pow = round((1:20)^4,0)
+pows_df = data_frame(Type= c("Turtle", "Good student", "Rabbit"),
+                      power=c(0.4, 0.5, 0.6)) %>%
+  mutate(mu = map(power, ~data_frame(n=n_pow, mu=2/n_pow^.))) %>%
+  unnest(mu)
+pows_sims = pows_df %>%
+  mutate(reject=map2_dbl(n, mu, ~rerun(200, power.rej(n=.x, mu=.y)) %>% unlist %>% mean ))
+
+#function readPNG() does not accept an URL, so we need to download first
+temp_rabbit = tempfile()
+download.file("http://moziru.com/images/bunny-clipart-vector-8.png", destfile = temp_rabbit,mode="wb", quiet=TRUE)
+img_rabbit = readPNG(temp_rabbit)
+
+ggplot(aes(x=mu, group=power, color=power),data=pows_sims) +
+geom_line(aes(y=reject)) +
+scale_colour_gradient(low = "lightblue",high = "black") +
+annotation_custom(rasterGrob(img_rabbit), xmin=0.1, xmax= 0.3, ymin=0.1, ymax=0.2)
+```

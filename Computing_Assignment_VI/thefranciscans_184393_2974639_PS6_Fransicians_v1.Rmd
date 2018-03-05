@@ -1,0 +1,147 @@
+---
+title: "PS 6 Franciscians"
+date: "2/27/2018"
+output: ioslides_presentation
+smaller: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(knitr)
+library(tidyverse)
+library(ggplot2)
+library(latex2exp)
+```
+
+
+
+## Analytical solution {.smaller}
+
+Let $X\sim N(\mu,1)$. We want to test $\mathbb{H}_0 : \mu = 0$ versus $\mathbb{H}_1 : \mu \neq 0$. We reject $\mathbb{H}_0$ if $|T|>c$ and note $T = (\bar{X}-\mu_0)/(\sigma\sqrt{n})$. We denote c as $z_{\alpha/2}$, and each null and alternative hypotheses as $\mu_0$ and $\mu_1$, respectively.
+We assume that $\sigma = 1$, and, given the alternative hypothesis, know that $\frac{(\bar{X}-\mu_1)}{(\sigma/\sqrt{n})}$ is standard-normally distributed. 
+
+The power function is
+$${\begin{align*}
+\pi(\mu) & = \text{Pr} \left( 
+T < - z_{\alpha/2} 
+: \mathbb{H}_1 \right) + 
+\text{Pr}\left(
+T > z_{\alpha/2}
+: \mathbb{H}_1 \right) \\
+& = 
+\text{Pr} \left( 
+(\bar{X}-\mu_0)/(\sigma/\sqrt{n}) < - z_{\alpha/2}
+: \mathbb{H}_1 \right) \\
+& + \text{Pr}\left(
+(\bar{X}-\mu_0)/(\sigma/\sqrt{n}) > z_{\alpha/2}
+: \mathbb{H}_1 \right) \\
+& = 
+\text{Pr} \left( 
+(\bar{X}-\mu_0-\mu_1)\sqrt{n} < - z_{\alpha/2} - \mu_1\sqrt{n} 
+: \mathbb{H}_1 \right) \\
+& + \text{Pr}\left(
+(\bar{X}-\mu_0-\mu_1)\sqrt{n} > z_{\alpha/2} - \mu_1\sqrt{n} 
+: \mathbb{H}_1 \right) \\
+& = 
+\text{Pr} \left( 
+(\bar{X}-\mu_1)\sqrt{n} < - z_{\alpha/2} + (\mu_0 - \mu_1)\sqrt{n} 
+: \mathbb{H}_1 \right) \\
+& + \text{Pr}\left(
+(\bar{X}-\mu_1)\sqrt{n} > z_{\alpha/2} +(\mu_0 -\mu_1)\sqrt{n} 
+: \mathbb{H}_1 \right) \\
+& = \Phi\left(- z_{\alpha/2} + \sqrt{n}(\mu_0-\mu_1)   \right) + 1 - \Phi\left(z_{\alpha/2} + \sqrt{n}(\mu_0-\mu_1) \right)
+\end{align*}}$$
+
+
+
+```{r}
+dgp <- function(n=n,mu=mu){
+  
+  dat <- rnorm(n, mean =mu,sd = 1)
+  zstat <- (mean(dat)-0)/(1/sqrt(n))
+  reject <- abs(zstat) > qnorm(1-.05/2)
+  return(reject)
+}
+
+montecarlo <- function(s=s,n=n,mu=mu){
+  tb <- tibble(
+    'n' = n,
+    'mu' = mu,
+    'reject' = mean(replicate(s,dgp(n,mu)))
+  )
+  return(tb)}
+
+params_gr <- expand.grid(mu=seq(-3,3,by=6/30),n=(2:30)^2)
+
+res_gr<-mapply(montecarlo, s=100, n=params_gr$n,mu=params_gr$mu, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame() 
+
+```
+
+## 1. Heat Map of Rejection Rates
+
+```{r}
+ggplot(data = res_gr, aes(x = factor(mu), y = factor(n))) +
+  geom_tile(aes(fill = reject)) + 
+  labs(x = TeX('$\\mu$'), y = "Sample size") +
+  scale_fill_gradient(name  ="Rejection rate")
+```
+
+## 2. Represent Power Curve vs. Mu
+
+```{r}
+power_gr1 <- res_gr %>%
+  select(n,mu,reject) %>%
+  filter(n %in% c(9,36,169))
+
+power_fun1 <- function(mu){
+  pnorm(-mu*sqrt(9)-qnorm(1-0.05/2))+1-pnorm(-mu*sqrt(9)+qnorm(1-0.05/2))
+}
+
+ggplot(data = power_gr1, aes(x=mu, y = reject, group = factor(n), colour = factor(n)))+
+  geom_line(size=1) +
+  stat_function(fun = power_fun1, size = .7, linetype="longdash", color="black") +
+  scale_colour_brewer("Sample size", palette="Dark2") +
+  labs(x = TeX('$\\mu$'), y = "Power") +
+  annotate("text", label="analytical curve, n=9", x=1.6, y=0.4)
+```
+
+## 3. Represent Power Curve vs. Mu
+
+```{r}
+power_gr2 <- res_gr %>%
+  select(n,mu,reject) %>%
+  filter(mu == 0 | (mu >.1 & mu < .3)| (mu >.3 & mu < .5)| (mu < -.5 & mu > -.7))
+power_fun2 <- function(n){
+  pnorm(-.2*sqrt(n)-qnorm(1-0.05/2))+1-pnorm(-.2*sqrt(n)+qnorm(1-0.05/2))
+}
+
+ggplot(data = power_gr2, aes(x=n, y = reject, group = factor(mu), colour = factor(mu)))+
+  geom_line(size=1) +
+  stat_function(fun = power_fun2, aes(colour="analytical, mu=0.2"), size = .7, linetype="longdash", colour="black") +
+  scale_colour_brewer(TeX('$\\mu$'), palette="Dark2") +
+  labs(x = TeX('$\\mu$'), y = "Power") +
+  annotate("text", label="analytical curve, mu=0.2", x=300, y=0.6)
+
+```
+
+## 5. Numerical Estimate {.smaller}
+
+If $\mu = 1$, then $n=500$ is easily a large enough to achieve 80% power. To achieve 90% power it would require $n \geq 11$ based on our analytical solution. A more interesting question is if $\mu = 0.1$, then $n=500$ would not achieve 80% power. To achieve 90% power with $\mu = 0.1$, it would require $n \geq 1051$.
+
+```{r, fig.height = 4, fig.width = 8} 
+params_gr <- expand.grid(mu=seq(.09,.11,by=.01),n=seq(500,2000,by=200))
+res_gr<-mapply(montecarlo, s=1000, n=params_gr$n,mu=params_gr$mu, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame() 
+
+ggplot(data = res_gr, aes(x=mu, y = reject, group = factor(n), colour = factor(n)))+
+  geom_line(size=1) +
+  scale_colour_brewer("Sample size", palette = "Dark2") +
+  labs(x = TeX('$\\mu$'), y = "Rejection rate")
+```
+
+
+
+

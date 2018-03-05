@@ -1,0 +1,98 @@
+---
+title: "Assignment VI"
+author: "YEP"
+date: "03/01/2018"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+##  Analytical Solution
+Power=Pr(Reject $H_{0}|\mu \neq 0$):
+$$Pr(|\frac{\bar{x}-0}{1/\sqrt{n}}|>1.96|\mu\neq0)$$
+$$Pr(\frac{\bar{x}-\mu}{1/\sqrt{n}}>\frac{\frac{1.96}{\sqrt{n}}-\mu}{1/\sqrt{n}})=Pr(Z>1.96-\sqrt{n}\mu)$$
+$$Pr(\frac{\bar{x}-\mu}{1/\sqrt{n}}<\frac{\frac{-1.96}{\sqrt{n}}-\mu}{1/\sqrt{n}})=Pr(Z<-1.96-\sqrt{n}\mu)$$
+$$=Pr(Z>1.96-\sqrt{n}\mu|\mu\neq0)+Pr(Z<-1.96-\sqrt{n}\mu|\mu\neq0)$$
+$$=1-\Phi(1.96-\sqrt{n}\mu)+\Phi(-1.96-\sqrt{n}\mu)$$
+
+##  Average rejection rate
+
+```{r }
+library(dplyr)
+library(ggplot2)
+library(broom)
+library(MASS)
+library(lmtest)
+library(knitr)
+set.seed(10101)
+dgp0 <- function(n,mu){
+  
+  x <-rnorm(n, mean = mu)
+  
+  t <- t.test(x,mu=0)
+  p.value <- tidy(t)[3]
+  rejected <- if(p.value<0.05){1
+  }else{
+   0}
+  
+  res <- cbind(n, mu, p.value, rejected)
+  res <- as.data.frame(res)
+  return(res)
+}
+
+S <- 200
+params_gr0 <-expand.grid(1:S, n=(2:30)^2 ,mu=seq(from=-5, to=5,by=0.3))
+res_gr0 <-mapply(dgp0, n=params_gr0$n, mu=params_gr0$mu,  SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+
+
+res_gr1 <-res_gr0 %>% group_by(n, mu) %>% 
+  summarise(ave_prob=mean(rejected))
+
+
+ggplot(res_gr1, aes(x=factor(mu), y=factor(n), fill=ave_prob)) +
+  geom_tile()+ 
+  scale_fill_gradient(low = "black", high = "steelblue")
+
+```
+
+## Power Curve
+
+```{r }
+res_gr2 <-res_gr1 %>% ungroup() %>%  
+  filter(n %in% c(4,100,400,900)) %>% 
+  mutate(power=1-pnorm(1.96-mu*20)+pnorm(-1.96-mu*20))
+
+
+ggplot(res_gr2, aes(x=mu, y=ave_prob, color= as.factor(n))) +
+  geom_line()+
+  geom_line(aes(x=mu,y=power, color="Analytical"))
+
+```
+
+## Power Curve
+```{r }
+res_gr3 <-res_gr1 %>% ungroup() %>%  
+  filter(mu %in% unique(res_gr1$mu)[c(17,18,20,22)]) %>% 
+  mutate(power=1-pnorm(1.96-(-0.2)*sqrt(n))+pnorm(-1.96-(-0.2)*sqrt(n)))
+
+ggplot(res_gr3, aes(x=n, y=ave_prob, color= as.factor(mu))) +
+  geom_line()+
+  geom_line(aes(x=n,y=power, color="Analytical"))
+
+```
+
+##  
+ 
+```{r ,echo = TRUE}
+#Power, n=500, m=1
+1-pnorm(1.96-sqrt(500))+pnorm(-1.96-sqrt(500))
+#Power, n=11, m=1
+1-pnorm(1.96-sqrt(11))+pnorm(-1.96-sqrt(11))
+```
+
+
+

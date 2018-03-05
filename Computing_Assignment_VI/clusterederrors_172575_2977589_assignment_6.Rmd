@@ -1,0 +1,133 @@
+---
+title: "Assignment 6"
+author: "Clustered Errors"
+date: "March 2, 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(ggplot2)
+library(BSDA)
+```
+
+# Power Enveloppe
+
+## Analytical results
+-The power curve represents the probability of rejecting the null hypothesis given that the null is false. 
+
+-We derive a power curve for a two sided test with $\frac{\alpha}{2} = 0.025$.
+
+-Notice that since the $x_i$ are drawn i.i.d. from a Normal with known mean and variance, the mean $\bar{x}$ is normally distributed with mean $\mu$ and variance $\frac{\sigma^2}{N} = \frac{1}{N}$ for all $N$.
+
+##
+-Then the probability of rejecting $H_0 : \mu =0 \ | \ \mu \neq 0$ is:
+
+$Pr\left[\left|\frac{\bar{x} - 0}{\sqrt{\hat{V_{\bar{x}}}}}\right| > z_{0.025} | \sqrt{N}\left(\bar{x} - \mu\right) \sim  N(0,1)  \right]$
+
+= $Pr\left[\sqrt{N}(\bar{x} - \mu) > (1.96 - \sqrt{N}\mu) | \sqrt{N}\left(\bar{x} - \mu\right) \sim  N(0,1)  \right]$ + $Pr\left[\sqrt{N}(\bar{x} - \mu) < (-1.96 - \sqrt{N}\mu) | \sqrt{N}\left(\bar{x} - \mu\right) \sim  N(0,1)  \right]$
+
+= $1 - \Phi(1.645 - \sqrt{N}\mu) + \Phi(1.645 - \sqrt{N}\mu)$
+
+-For any $N$ and $\mu$, the power of the mean test is $1 - \Phi(1.96 - \sqrt{N}\mu) + \Phi(1.96 - \sqrt{N}\mu)$.
+
+
+```{r create_grid}
+seq_n1 <- seq(from = 10, to = 19, by = 1)
+seq_n5 <- seq(from = 20, to = 65, by = 5)
+seq_n10 <- seq(from = 70, to = 170, by = 10)
+n <- c(seq_n1, seq_n5, seq_n10)
+seq_mu1 <- (seq(0, 1, (1/10)))^2
+seq_mu_neg1 <- -(seq(-1, -(1/100), (1/10)))^2
+seq_mu_neg5 <- seq(-3.5, -1.5, 0.5)
+seq_mu5 <- seq(1.5, 3.5, 0.5)
+mu <- c(seq_mu1, seq_mu_neg1, seq_mu_neg5, seq_mu5)
+grid <- expand.grid(n = n, mu = mu)
+```
+
+```{r simulation}
+sim <- function(n, mu) {
+  # Draw sample
+  data <- rnorm(n, mean = mu)
+  test_result <- z.test(data, sigma.x = 1)
+  reject <- (test_result$p.value < 0.05)
+  pow <- 1 - pnorm(1.96 - sqrt(n)*mu) + pnorm(-1.96 - sqrt(n)*mu)
+  sim_df <- data.frame(reject = reject, pow = pow)
+  return(sim_df)
+}
+
+sim_output <- mutate(grid, simulations = map2(n, mu, ~ rerun(100, sim(n = .x, mu = .y)) %>% bind_rows))
+```
+
+## Heatmap
+
+```{r question_1}
+unnested_sims <- unnest(sim_output, simulations) %>% mutate(n = as.factor(n), mu = as.factor(mu)) 
+
+heat_map_means <- group_by(unnested_sims, n, mu) %>% summarize(avg_reject = mean(reject), avg_pow = mean(pow))
+
+hm <- ggplot(heat_map_means, aes(n, mu)) + geom_tile(aes(fill = avg_reject), colour = "white") + scale_fill_gradient(low = "springgreen1", high = "steelblue")
+print(hm)
+```
+
+
+## Power curve, varying $n$
+
+```{r question_2}
+means <- unnest(sim_output, simulations) %>% 
+  mutate(n = as.factor(n)) %>%
+  group_by(n, mu, pow) %>% 
+  summarize(avg_reject = mean(reject))
+
+data_pn <- subset(means, n %in% c(10, 20, 40, 100))
+pow_10 <- function(mu) {1 - pnorm(1.96 - sqrt(10)*mu) + pnorm(-1.96 - sqrt(10)*mu)}
+pow_20 <- function(mu) {1 - pnorm(1.96 - sqrt(20)*mu) + pnorm(-1.96 - sqrt(20)*mu)}
+pow_40 <- function(mu) {1 - pnorm(1.96 - sqrt(40)*mu) + pnorm(-1.96 - sqrt(40)*mu)}
+pow_100 <- function(mu) {1 - pnorm(1.96 - sqrt(100)*mu) + pnorm(-1.96 - sqrt(100)*mu)}
+
+pc_n <- ggplot(data_pn, aes(x = mu, y = avg_reject)) + geom_line(aes(color = n))
+
+print(pc_n)
+```
+
+
+## Power curve, varying $n$
+```{r question_2a}
+pc_n_ac <- ggplot(data_pn, aes(x = mu, y = avg_reject)) + geom_line(aes(color = n)) + stat_function(fun= pow_10) + stat_function(fun= pow_20) + stat_function(fun= pow_40) + stat_function(fun= pow_100)
+
+print(pc_n_ac)
+```
+
+Analytical curves included
+
+## Power curve, varying $\mu$
+
+```{r question_3}
+means <- unnest(sim_output, simulations) %>% 
+  mutate(mu = as.factor(mu)) %>%
+  group_by(n, mu, pow) %>% 
+  summarize(avg_reject = mean(reject), avg_pow = mean(pow))
+
+data_pmu <- subset(means, mu %in% c(0, 0.25, 0.64, 1))
+
+
+##### Matthieu - I couldn't figure out how to pass the mu values through into the argument of the power function. So you get a list. Sorry.
+pow_0 <- function(n) {1 - pnorm(1.96 - sqrt(n)*0) + pnorm(-1.96 - sqrt(n)*0)}
+pow_25 <- function(n) {1 - pnorm(1.96 - sqrt(n)*0.25) + pnorm(-1.96 - sqrt(n)*0.25)}
+pow_64 <- function(n) {1 - pnorm(1.96 - sqrt(n)*0.64) + pnorm(-1.96 - sqrt(n)*0.64)}
+pow_1 <- function(n) {1 - pnorm(1.96 - sqrt(n)*1) + pnorm(-1.96 - sqrt(n)*1)}
+
+
+pm_u <- ggplot(data_pmu, aes(x = n, y = avg_reject)) + geom_line(aes(color = mu)) +stat_function(fun= pow_0) +stat_function(fun= pow_25) +stat_function(fun= pow_64) +stat_function(fun= pow_1) + annotate("text", x= 125, y = 0.4, label = "Black lines show analytical curves")
+print(pm_u)
+```
+
+## Power calculations
+
+```{r question_5}
+mu_1 <- subset(means, mu == 1)
+
+pc <- ggplot(mu_1, aes(x = n, y= pow)) + geom_smooth(method = "loess", se = FALSE, formula = y~x) + geom_hline(yintercept = .9)
+```
+Clearly, when n = 500, the power of the test is essentially 1, far above 0.8. To reach power of 0.9, we require n = 11. 

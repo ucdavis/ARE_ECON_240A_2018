@@ -1,0 +1,88 @@
+---
+title: "Homework6"
+author: "Fledging RUCers"
+date: "2018/3/1"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(broom)
+library(tidyverse)
+```
+
+## Analytical Results
+
+\[\begin{aligned}
+power&=Pr(Reject H_0|H_1)\\
+&=Pr(|t|>c|\mu=\mu_0)\\
+&=Pr(\frac{\overline{x}-0}{\sqrt{\frac{1}{n}}}>c|\mu=\mu_0)+Pr(\frac{\overline{x}-0}{\sqrt{\frac{1}{n}}}<-c|\mu=\mu_0)\\
+&=Pr(\frac{\overline{x}-\mu_0}{\sqrt{\frac{1}{n}}}>\frac{c\sqrt{\frac{1}{n}}-\mu_0}{\sqrt{\frac{1}{n}}}|\mu=\mu_0)+Pr(\frac{\overline{x}-\mu_0}{\sqrt{\frac{1}{n}}}<\frac{-c\sqrt{\frac{1}{n}}-\mu_0}{\sqrt{\frac{1}{n}}}|\mu=\mu_0)\\
+&=1-\Phi(c-\frac{\mu_0}{\sqrt{\frac{1}{n}}})+\Phi(-c-\frac{\mu_0}{\sqrt{\frac{1}{n}}})
+\end{aligned}\]
+
+```{r simulation results}
+library(tidyverse)
+library(broom)
+set.seed(2018)
+test=function(x,mu,df){
+  t=(mean(x)-0)/(sqrt(1/df))
+  gauge=qnorm(0.025,lower.tail=FALSE)
+  res=ifelse(abs(t)>gauge,yes=1,no=0)
+  return(res)
+}
+simu=function(mu,n){
+  n=rep(n,100)
+  res=map2(n,mu,~rnorm(.x,mean=.y)%>%test(mu=.y,df=.x))%>%unlist()
+  return(sum(res)/100)  
+}
+mu=seq(-3,3,by=1/5)
+n=(2:30)^2
+input=expand.grid(n,mu)
+colnames(input)=c("n","mu")
+res=mutate(input,prob=map2(input$mu,input$n,~simu(mu=.x,n=.y)))%>%
+  unnest(prob)
+```
+
+## Question 1
+
+```{r}
+ggplot(data=res)+
+  geom_tile(aes(x=factor(mu),y=factor(n),fill=prob))
+```
+
+##Question 2
+
+```{r}
+res1=res%>%
+  mutate(true=1-pnorm(qnorm(0.975)-sqrt(n)*mu)+pnorm(qnorm(0.025)-sqrt(n)*mu))
+res1%>%
+  filter(n %in% c(4,25,100,361)) %>%
+  ggplot(aes(color =factor(n))) +
+  geom_point(aes(x=mu,y=prob)) +
+  geom_line(aes(x=mu,y=true)) 
+```
+
+##Question3
+
+```{r}
+res1%>% 
+  filter(mu %in% seq(-3,3,by = 1/5)[c(16:20)]) %>%
+  ggplot(aes(colour = factor(mu))) +
+  geom_point(aes(x=n,y=prob)) +
+  geom_line(aes(x=n,y=true)) 
+```
+
+##Question5
+
+```{r}
+n=500
+myfunction = function(n,u=1){
+  return(1- pnorm(qnorm(0.975)-sqrt(n)*u) + pnorm(qnorm(0.025) - sqrt(n)*u))
+}
+myfunction(n=n)
+df = data.frame(n = 1:500)
+df$power = myfunction(n = df$n)
+df$nstar = abs(df$power - 0.9)
+which(df$nstar == min(df$nstar))
+```
