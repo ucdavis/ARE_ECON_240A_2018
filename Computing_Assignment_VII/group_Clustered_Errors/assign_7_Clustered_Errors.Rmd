@@ -7,32 +7,37 @@ output: ioslides_presentation
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+library(AER)
+library(readr)
 ```
 
 ```{r import}
-library(readr)
-setwd("U:/Courses/240A/Git folder/ARE_ECON_240A_2018/Computing_Assignment_VII/data")
 data <- read_csv("RSdata.csv")
-View(data)
-setwd("U:/Courses/240A/Git folder/ARE_ECON_240A_2018/Computing_Assignment_VII/group_Clustered_Errors")
 ```
 
 ```{r OLS_reg}
-  #mutate(data, ln_fp_l = c(0, data$ln_fp[1:nrow(data)-1]))
-OLS_sup <- lm(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3)
-OLS_dmd <- lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3)
+OLS_sup_w <- lm(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
+OLS_dmd <- lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3, data = data)
+OLS_sup_now <- lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data = data)
+summary(OLS_sup_w)
+summary(OLS_sup_now)
+summary(OLS_dmd)
 ```
 
 ```{r IV_reg}
-library(AER)
-IV_sup <- ivreg()
-IV_dmd <- ivreg()
+IV_sup <- ivreg(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 | lag_ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
+IV_dmd <- ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
+summary(IV_sup)
+summary(IV_dmd)
 ```
 
 ## Comparison to Table 4
+In our initial model, including the ln_w variable, we find an estimated supply elasticity of 0.089 and a demand elasticity of -0.017. Our supply elasticity is far away from the RS point estimate, however they are both inelastic. The demand elasticity is fairly close to the RS point estimate. 
 
+After removing ln_w from the supply model, we find a new supply elasticity of 0.038. This is closer to the estimate reported in the table, but still not as close as our estimated demand elasticity. 
 
 ## Comparison to Table 1
+Using the IV regressions, we find a supply elasticity of 0.060 and a demand elasticity of -0.063. Again, the supply elasticity is not close to the point estimate in Table 1, but it is still inelastic (though the value presented in the Table is much closer to unit elastic). The demand elasticity is very close to the estimate from the paper. 
 
 
 ## Hausman test
