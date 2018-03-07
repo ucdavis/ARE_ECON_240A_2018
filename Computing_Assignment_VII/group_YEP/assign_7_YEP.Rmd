@@ -1,13 +1,73 @@
 ---
 title: "Computing Assignment VII"
-author: "group"
+author: "YEP"
 date: "March 9, 2018"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
 ```
 
-## your document
+## Q1
 
+```{r }
+library(dplyr)
+library(AER)
+library(plm)
+
+data_RS <-read.csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
+
+data <- data.frame(sapply(data_RS, function(x) as.numeric(as.character(x))))
+data <- data %>% mutate(lag_ln_w = dplyr::lag(ln_w))
+
+#Q1
+reg.sup <- lm(ln_qs ~ ln_fp + ln_w + trendsp1+ trendsp2 + trendsp3 , data=data)
+summary(reg.sup)
+
+```
+
+## Q1
+
+```{r }
+reg.dem <- lm(ln_qd ~ ln_sp + trendsp1+ trendsp2+ trendsp3, data=data)
+summary(reg.dem)
+
+```
+
+## IV
+
+```{r }
+reg.iv.sup <- ivreg(ln_qs ~ ln_fp + ln_w + trendsp1+ trendsp2 + trendsp3|
+                      lag_ln_w + ln_w + trendsp1+ trendsp2 + trendsp3, data=data)
+summary(reg.iv.sup)
+
+```
+
+## IV
+
+```{r }
+reg.iv.dem <- ivreg(ln_qd ~ ln_sp + trendsp1+ trendsp2+ trendsp3|
+                      ln_w  + trendsp1+ trendsp2+ trendsp3, data=data)
+summary(reg.iv.dem)
+
+```
+
+## Hausman Test
+
+```{r }
+
+cf_diff <- coef(reg.iv.sup) - coef(reg.sup)
+vc_diff <- vcov(reg.iv.sup) - vcov(reg.sup)
+x2_diff <- as.vector(t(cf_diff) %*% solve(vc_diff) %*% cf_diff)
+t <- pchisq(x2_diff, df = 2, lower.tail = FALSE)
+round(t, digits=2)
+
+```
+
+## Q4
+
+```{r }
+reg.sup.2 <- lm(log(area) ~ ln_fp + ln_w + trendsp1+ trendsp2 + trendsp3 , data=data)
+summary(reg.sup.2)
+```
