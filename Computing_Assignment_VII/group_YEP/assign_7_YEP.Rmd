@@ -1,6 +1,6 @@
 ---
 title: "Computing Assignment VII"
-author: "YEP"
+author: "YEP "
 date: "March 9, 2018"
 output: pdf_document
 ---
