@@ -39,4 +39,22 @@ kable(rbind(ln_fp = summary(iv1)$coef["ln_fp",1:2], ln_sp = summary(iv2)$coef["l
 
 The estimates do not match exact to the results of the paper, but in the same ball park, and general results are consistent.
 
+## Hausman Test p-value
+```{r Hausman}
+## Hausman Test ##
+kable(data.frame(supply = summary(iv1, diagnostics = T)$diagnostics["Wu-Hausman","p-value"],
+           demand = summary(iv2, diagnostics = T)$diagnostics["Wu-Hausman","p-value"]),
+      digits=3, caption = "Using diagnostics")
 
+## Hausman Test- Manual ##
+# Supply
+resid1 = lm(ln_fp ~ lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)$res
+resid2 = lm(ln_sp ~ ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)$res
+
+kable(data.frame(supply = summary(lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 + resid1, data=cbind(RSdata,resid1)))$coef["resid1","Pr(>|t|)"],
+                 demand = summary(lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 + resid2, data=cbind(RSdata,resid1)))$coef["resid2","Pr(>|t|)"]),
+      digits=3, caption= "Manual Computation")
+
+```
+
+Difference between OLS and IV not significant for demand equation but signficiant for supply equation
