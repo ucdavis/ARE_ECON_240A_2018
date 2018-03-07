@@ -18,6 +18,7 @@ mydata = read.csv("RSdata.csv")
 OLS1   = lm(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data = mydata)
 OLS2   = lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data = mydata)
 OLS3   = lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3, data = mydata)
+
 stargazer(OLS1,OLS2,OLS3,header = F, column.labels = c("Supply","Supply","Demand"),dep.var.labels = c("",""),title = "Q1")
 ```
 
