@@ -35,7 +35,7 @@ summary(IV_qs)
 
 ```
 
-The supply elasticity for total quantity is approximately 0.9 and that for area is 0.63. The difference stems from log(yield) which is ln_qs - ln(area). The mean of log(yield) is 2.13 ranging from 1.57 to 2.57. The correlation of ln_qs and log(area) is almost one.
+The supply elasticity for total quantity is approximately $0.9$ and that for area is $0.63$. The difference stems from $log(yield)$ which is $ln(qs) - ln(area)$. The mean of $log(yield)$ is $2.13$ ranging from $1.57$ to $2.57$. The correlation of $ln(qs)$ and $log(area)$ is almost one.
 
 ```{r setup, include=FALSE}
 
@@ -55,13 +55,13 @@ IV_qd_reduced<-ivreg(ln_qd~ ln_sp +trendsp1+ trendsp2+trendsp3 |ln_w+ trendsp1+t
 summary(IV_qs_reduced)  
 ```
 
-The supply elasticity is almost 0.1, which is close to the coefficient estimated with the full sample
+The supply elasticity is almost $0.1$, which is close to the coefficient estimated with the full sample.
 
 ```{r setup, include=FALSE}
 summary(IV_qd_reduced)  
 
 ```
 
-The demand elasticity is almost -0.066, which is close to the coefficient (-0.063) estimated with the full sample.
+The demand elasticity is almost $-0.066$, which is close to the coefficient $(-0.063)$ estimated with the full sample.
 
 
