@@ -1,8 +1,8 @@
 ---
-title: "Computing Assignment VII"
-author: "group"
-date: "March 9, 2018"
-output: pdf_document
+title: "Assignment 7"
+author: "USER"
+date: "March 6, 2018"
+output: slidy_presentation
 ---
 
 ```{r setup, include=FALSE}
