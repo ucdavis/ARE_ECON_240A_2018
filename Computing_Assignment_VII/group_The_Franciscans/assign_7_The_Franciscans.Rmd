@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = FALSE)
 library(knitr)
 library(tidyverse)
 library(AER)
+library(matlib)
 ```
 
 ```{r}
@@ -54,13 +55,13 @@ summary(IV_demand)
 # full model including ln_w
 beta_diff <- coefficients(OLS_supply) - coefficients(IV_supply)
 cov_diff <- vcov(IV_supply) - vcov(OLS_supply)
-Hs = t(beta_diff) %*% solve(cov_diff) %*% beta_diff
+Hs = t(beta_diff) %*% Ginv(cov_diff) %*% beta_diff
 Hs
 
 # model excluding ln_w -- how do we do this when the matrices are different sizes?? 
 beta_diff_exclw <- coefficients(OLS_supply_exclw) - coefficients(IV_supply)
 cov_diff_exclw <- vcov(IV_supply) - vcov(OLS_supply_exclw)
-Hs_exclw = t(beta_diff_exclw) %*% solve(cov_diff_exclw) %*% beta_diff_exclw
+Hs_exclw = t(beta_diff_exclw) %*% Ginv(cov_diff_exclw) %*% beta_diff_exclw
 Hs_exclw
 ```
 
