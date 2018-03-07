@@ -1,13 +1,48 @@
 ---
-title: "Computing Assignment VII"
-author: "group"
+title: "Assignment 7"
+author: "Clustered Errors"
 date: "March 9, 2018"
-output: pdf_document
+output: ioslides_presentation
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
-## your document
+```{r import}
+library(readr)
+setwd("U:/Courses/240A/Git folder/ARE_ECON_240A_2018/Computing_Assignment_VII/data")
+data <- read_csv("RSdata.csv")
+View(data)
+setwd("U:/Courses/240A/Git folder/ARE_ECON_240A_2018/Computing_Assignment_VII/group_Clustered_Errors")
+```
+
+```{r OLS_reg}
+  #mutate(data, ln_fp_l = c(0, data$ln_fp[1:nrow(data)-1]))
+OLS_sup <- lm(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3)
+OLS_dmd <- lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3)
+```
+
+```{r IV_reg}
+library(AER)
+IV_sup <- ivreg()
+IV_dmd <- ivreg()
+```
+
+## Comparison to Table 4
+
+
+## Comparison to Table 1
+
+
+## Hausman test
+
+
+## Supply Elasticity
+
+
+## Sensitivity to additional data
+
+
+##Structure of dataset
 
