@@ -1,13 +1,94 @@
 ---
-title: "Computing Assignment VII"
-author: "group"
+title: "Assignment 7"
+author: "Clustered Errors"
 date: "March 9, 2018"
-output: pdf_document
+output: ioslides_presentation
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
+library(AER)
+library(readr)
+library(tidyverse)
 ```
 
-## your document
+```{r import}
+data <- read_csv("RSdata.csv")
+```
 
+```{r OLS_reg}
+OLS_sup_w <- lm(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
+OLS_dmd <- lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3, data = data)
+OLS_sup_now <- lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data = data)
+summary(OLS_sup_w)
+summary(OLS_sup_now)
+summary(OLS_dmd)
+```
+
+```{r IV_reg}
+IV_sup <- ivreg(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 | lag_ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
+IV_dmd <- ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
+summary(IV_sup)
+summary(IV_dmd)
+```
+
+```{r hausman_test}
+sup_coef_ols_w <- coef(OLS_sup_w)["ln_fp"]
+sup_coef_ols_now <- coef(OLS_sup_now)["ln_fp"]
+sup_coef_IV <- coef(IV_sup)["ln_fp"]
+
+sup_var_ols_w <- (summary(OLS_sup_w)$coefficients[2,2])^2
+sup_var_ols_now <- (summary(OLS_sup_now)$coefficients[2,2])^2
+sup_var_IV <- (summary(IV_sup)$coefficients[2,2])^2
+var_hausman_w <- sup_var_ols_w + sup_var_IV
+var_hausman_now <- sup_var_ols_now + sup_var_IV
+
+hausman_w <- ((sup_coef_IV - sup_coef_ols_w)^2)/var_hausman_w
+hausman_now <- ((sup_coef_IV - sup_coef_ols_now)^2)/var_hausman_now
+
+names(hausman_w) <- "haus_w"
+names(hausman_now) <- "haus_now"
+
+hausman_w
+hausman_now
+
+pchisq(hausman_w, df = 1)
+pchisq(hausman_now, df = 1)
+```
+
+```{r regs_with_area}
+data <- mutate(data, ln_area = log(area))
+OLS_sup_area_w <- lm(ln_area ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
+OLS_sup_area_now <- lm(ln_area ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data = data)
+
+summary(OLS_sup_area_w)
+summary(OLS_sup_w)
+
+summary(OLS_sup_area_now)
+summary(OLS_sup_now)
+```
+
+
+## Comparison to Table 4
+In our initial model, including the ln_w variable, we find an estimated supply elasticity of 0.089 and a demand elasticity of -0.017. Our supply elasticity is far away from the RS point estimate, however they are both inelastic. The demand elasticity is fairly close to the RS point estimate. 
+
+After removing ln_w from the supply model, we find a new supply elasticity of 0.038. This is closer to the estimate reported in the table, but still not as close as our estimated demand elasticity. 
+
+## Comparison to Table 1
+Using the IV regressions, we find a supply elasticity of 0.060 and a demand elasticity of -0.063. Again, the supply elasticity is not close to the point estimate in Table 1, but it is still inelastic (though the value presented in the Table is much closer to unit elastic). The demand elasticity is very close to the estimate from the paper. 
+
+## Hausman test
+We calculate a Hausman statistic comparing the coefficient from the supply regression with ln_w to the IV regression of 0.295. This provides evidence that we cannot reject the null hypothesis that the coefficients are the same between the two regressions.
+
+Similarly, we find a Hausman statistic of 0.144 in comparing the coefficient from the supply regression without ln_w to the IV regression. This also leads us to fail to reject the null hypothesis.
+
+## Supply Elasticity: Area vs. Total Quantity
+Since we have performed two supply regressions previously, in one case including ln_w and excluding it in the other, we make the same comparisons here. 
+
+In the first case, the two supply elasticities are fairly close. The supply elasticity for total quantity is 0.089, while the supply elasticity for area alone is 0.063. Similarly, when ln_w is included in both models, we find a supply elasticity for total quantity is 0.038 and for area of 0.055.
+
+## Sensitivity to additional data
+No, we can see that there are no qualitative differences in the results.
+
+##Structure of dataset
+It is poorly organized 
