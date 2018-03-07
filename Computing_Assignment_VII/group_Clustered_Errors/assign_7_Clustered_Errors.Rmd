@@ -88,7 +88,7 @@ Since we have performed two supply regressions previously, in one case including
 In the first case, the two supply elasticities are fairly close. The supply elasticity for total quantity is 0.089, while the supply elasticity for area alone is 0.063. Similarly, when ln_w is included in both models, we find a supply elasticity for total quantity is 0.038 and for area of 0.055.
 
 ## Sensitivity to additional data
-
+No, we can see that there are no qualitative differences in the results.
 
 ##Structure of dataset
-
+It is poorly organized 
