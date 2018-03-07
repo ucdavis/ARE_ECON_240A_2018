@@ -9,6 +9,7 @@ output: ioslides_presentation
 knitr::opts_chunk$set(echo = FALSE)
 library(AER)
 library(readr)
+library(tidyverse)
 ```
 
 ```{r import}
@@ -55,6 +56,18 @@ pchisq(hausman_w, df = 1)
 pchisq(hausman_now, df = 1)
 ```
 
+```{r regs_with_area}
+data <- mutate(data, ln_area = log(area))
+OLS_sup_area_w <- lm(ln_area ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
+OLS_sup_area_now <- lm(ln_area ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data = data)
+
+summary(OLS_sup_area_w)
+summary(OLS_sup_w)
+
+summary(OLS_sup_area_now)
+summary(OLS_sup_now)
+```
+
 
 ## Comparison to Table 4
 In our initial model, including the ln_w variable, we find an estimated supply elasticity of 0.089 and a demand elasticity of -0.017. Our supply elasticity is far away from the RS point estimate, however they are both inelastic. The demand elasticity is fairly close to the RS point estimate. 
@@ -69,8 +82,10 @@ We calculate a Hausman statistic comparing the coefficient from the supply regre
 
 Similarly, we find a Hausman statistic of 0.144 in comparing the coefficient from the supply regression without ln_w to the IV regression. This also leads us to fail to reject the null hypothesis.
 
-## Supply Elasticity
+## Supply Elasticity: Area vs. Total Quantity
+Since we have performed two supply regressions previously, in one case including ln_w and excluding it in the other, we make the same comparisons here. 
 
+In the first case, the two supply elasticities are fairly close. The supply elasticity for total quantity is 0.089, while the supply elasticity for area alone is 0.063. Similarly, when ln_w is included in both models, we find a supply elasticity for total quantity is 0.038 and for area of 0.055.
 
 ## Sensitivity to additional data
 
