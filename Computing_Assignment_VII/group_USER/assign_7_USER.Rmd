@@ -31,9 +31,9 @@ iv2 = ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 |
                      ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
 
 # OLS results #
-kable(rbind(ln_fp = summary(OLS1)$coef["ln_fp",1:2], ln_sp = summary(OLS2)$coef["ln_sp",1:2]), digits = 3, caption="OLS Estimates")
+kable(rbind(ln_fp = summary(OLS1)$coef["ln_fp",1:2], ln_sp = summary(OLS2)$coef["ln_sp",1:2]), digits = 3, caption="Table 1a. OLS Estimates")
 # IV results #
-kable(rbind(ln_fp = summary(iv1)$coef["ln_fp",1:2], ln_sp = summary(iv2)$coef["ln_sp",1:2]), digits = 3, caption="IV Estimates")
+kable(rbind(ln_fp = summary(iv1)$coef["ln_fp",1:2], ln_sp = summary(iv2)$coef["ln_sp",1:2]), digits = 3, caption="Table 1b. IV Estimates")
 
 ```
 
@@ -44,7 +44,7 @@ The estimates do not match exact to the results of the paper, but in the same ba
 ## Hausman Test ##
 kable(data.frame(supply = summary(iv1, diagnostics = T)$diagnostics["Wu-Hausman","p-value"],
            demand = summary(iv2, diagnostics = T)$diagnostics["Wu-Hausman","p-value"]),
-      digits=3, caption = "Using diagnostics")
+      digits=3, caption = "Table 2. Using diagnostics")
 
 ## Hausman Test- Manual ##
 # Supply
@@ -58,3 +58,24 @@ kable(data.frame(supply = summary(lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trend
 ```
 
 Difference between OLS and IV not significant for demand equation but signficiant for supply equation
+
+## Supply elasticity for Area
+```{r Area}
+iv3 = ivreg(ln_area ~ ln_fp + trendsp1 + trendsp2 + trendsp3 |
+              lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+kable(data.frame(elasticity=summary(iv3)$coef["ln_fp",1:2]), digits=3, caption = "Table 3. Supply elasticity for Area")
+```
+
+Supply elasticity for area slightly higher than that for total quantity, but are comparable.
+
+## Additional years of data
+```{r ext}
+iv1b = ivreg(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 | lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata.ext)
+iv2b = ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w     + trendsp1 + trendsp2 + trendsp3, data=RSdata.ext)
+kable(rbind(ln_fp = summary(iv1b)$coef["ln_fp",1:2], ln_sp = summary(iv2b)$coef["ln_sp",1:2]), digitis = 3, caption = "Table 4. Additional 7 years of recent data")
+```
+
+Estimates are different but arguably not very different and does not change the main results
+
+## Comments on original datasets
+The orginal datasets and code are provided by the authors in a modular fashion. The authors could have organized the data in a single dataset and provided the code in only one file with indicated sections, which would have made replicating the results a bit easier. But on the other hand, compared to many other authors who provide data and code with little explaination, theirs is relatively complete. 
