@@ -6,8 +6,62 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(AER)
+
+RSdata_raw <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")%>% mutate(.,ln_area=log(area))
+RSdata <- na.omit(RSdata_raw)
+##1
+reg_qs<- lm(ln_qs ~ ln_fp+trendsp1+trendsp2+trendsp3, data=RSdata,na.rm=TRUE)
+
+
+reg_qd<- lm(ln_qd ~ ln_sp +trendsp1+ trendsp2+trendsp3, data=RSdata)
+summary(reg_qs)
+summary(reg_qd)
+
+##2
+IV_qs<-ivreg(ln_qs~ ln_fp + ln_w+ trendsp1+trendsp2 +trendsp3 | ln_w+lag_ln_w+ trendsp1+trendsp2+trendsp3, data=RSdata)
+IV_qd<-ivreg(ln_qd~ ln_sp +trendsp1+ trendsp2+trendsp3 |ln_w+ trendsp1+trendsp2+trendsp3, data=RSdata)
+
+summary(IV_qs)
+summary(IV_qd)
+
+
+##4
+
+IV_area<-ivreg(ln_area~ ln_fp + ln_w+ trendsp1+trendsp2 +trendsp3 | ln_fp+ln_w+lag_ln_w+ trendsp1+trendsp2+trendsp3, data=RSdata)
+summary(IV_area)
+summary(IV_qs)
+
 ```
 
-## your document
+The supply elasticity for total quantity is approximately 0.9 and that for area is 0.63. The difference stems from log(yield) which is ln_qs - ln(area). The mean of log(yield) is 2.13 ranging from 1.57 to 2.57. The correlation of ln_qs and log(area) is almost one.
+
+```{r setup, include=FALSE}
+
+cor(RSdata$ln_area, RSdata$ln_qs)
+a<-RSdata$ln_qs-RSdata$ln_area
+max(a)
+mean(a)
+min(RSdata$ln_qs)
+min(a)
+
+##5
+
+RSdata_reduced<- filter(RSdata, year<=2008)
+IV_qs_reduced<-ivreg(ln_qs~ ln_fp + ln_w+ trendsp1+trendsp2 +trendsp3 | ln_w+lag_ln_w+ trendsp1+trendsp2+trendsp3, data=RSdata_reduced)
+IV_qd_reduced<-ivreg(ln_qd~ ln_sp +trendsp1+ trendsp2+trendsp3 |ln_w+ trendsp1+trendsp2+trendsp3, data=RSdata_reduced)
+
+summary(IV_qs_reduced)  
+```
+
+The supply elasticity is almost 0.1, which is close to the coefficient estimated with the full sample
+
+```{r setup, include=FALSE}
+summary(IV_qd_reduced)  
+
+```
+
+The demand elasticity is almost -0.066, which is close to the coefficient (-0.063) estimated with the full sample.
+
 
