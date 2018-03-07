@@ -1,13 +1,61 @@
 ---
 title: "Computing Assignment VII"
-author: "group"
+author: "Ozone"
 date: "March 9, 2018"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = F)
+knitr::opts_knit$set(root.dir = "~/Downloads/240A_Assign_7_data")
+library(stargazer)
+library(AER)
 ```
 
-## your document
+##Q1
+```{r, results='asis'}
+mydata = read.csv("RSdata.csv")
+OLS1   = lm(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data = mydata)
+OLS2   = lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data = mydata)
+OLS3   = lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3, data = mydata)
+stargazer(OLS1,OLS2,OLS3,header = F, column.labels = c("Supply","Supply","Demand"),dep.var.labels = c("",""),title = "Q1")
+```
 
+Authors did not include log yield shock when estimate supply elasticity. 
+
+##Q2
+```{r,results='asis'}
+IV1   = ivreg(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3|.-ln_fp + lag_ln_w, data = mydata)
+IV2   = ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3|.-ln_sp + ln_w, data = mydata)
+stargazer(IV1,IV2,header = F, column.labels = c("Supply","Demand"),dep.var.labels = c("",""),title = "Q2")
+```
+
+##Q3
+
+We reject the first test and do not reject the second test.
+```{r,results='asis'}
+H1 = (IV1$coefficients[2] - OLS2$coefficients[2])^2*(summary(IV1)[["coefficients"]][2,2]^2 - summary(OLS2)[["coefficients"]][2,2]^2)^(-1)
+pchisq(H1,1)
+
+H2 = (IV1$coefficients[2] - OLS1$coefficients[2])^2*(summary(IV1)[["coefficients"]][2,2]^2 - summary(OLS1)[["coefficients"]][2,2]^2)^(-1)
+pchisq(H2,1)
+```
+
+##Q4
+```{r, results='asis'}
+mydata$ln_area = log(mydata$area)
+OLS4  = lm(ln_area ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data = mydata)
+OLS5  = lm(ln_area ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data = mydata)
+IV3   = ivreg(ln_area ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3|.-ln_fp + lag_ln_w, data = mydata)
+stargazer(OLS4,OLS5,IV3,header = F,dep.var.labels = c("","",""),title = "Q4")
+```
+
+We observe a difference around 20% between the total quantity model and area model, which implies part of the change in total supply is from yield adjustment.
+
+##Q5
+
+From the estimations in previous questions, we notice discrepancies after adding 7 years data.
+
+##Q6
+
+The data used by author is in long form and not easy to understand. Also it is not easy to manupalate. 
