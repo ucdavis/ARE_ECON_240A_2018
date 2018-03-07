@@ -1,13 +1,81 @@
 ---
-title: "Computing Assignment VII"
-author: "group"
-date: "March 9, 2018"
-output: pdf_document
+title: "Assignment 7"
+author: "USER"
+date: "March 6, 2018"
+output: slidy_presentation
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
 ```
 
-## your document
+## Replication of Robert and Schlenker
+```{r IV and OLS}
+library(tidyverse)
+#install.packages("AER")
+library(AER)
+library(knitr)
+rm(list=ls())
 
+data.all = read.csv("C:/Users/tluo/Downloads/RSdata.csv")  # Location of downloaded dataset
+RSdata.ext = data.all %>% mutate(lag_ln_w=lag(ln_w), ln_area=log(area)) %>% filter(year>=1962)
+RSdata = filter(RSdata.ext, year<=2007)
+
+# OLS #
+OLS1 = lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+OLS2 = lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+# IV #
+iv1 = ivreg(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 |
+                 lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+iv2 = ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 |
+                     ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+
+# OLS results #
+kable(rbind(ln_fp = summary(OLS1)$coef["ln_fp",1:2], ln_sp = summary(OLS2)$coef["ln_sp",1:2]), digits = 3, caption="Table 1a. OLS Estimates")
+# IV results #
+kable(rbind(ln_fp = summary(iv1)$coef["ln_fp",1:2], ln_sp = summary(iv2)$coef["ln_sp",1:2]), digits = 3, caption="Table 1b. IV Estimates")
+
+```
+
+The estimates do not match exact to the results of the paper, but in the same ball park, and general results are consistent.
+
+## Hausman Test p-value
+```{r Hausman}
+## Hausman Test ##
+kable(data.frame(supply = summary(iv1, diagnostics = T)$diagnostics["Wu-Hausman","p-value"],
+           demand = summary(iv2, diagnostics = T)$diagnostics["Wu-Hausman","p-value"]),
+      digits=3, caption = "Table 2. Using diagnostics")
+
+## Hausman Test- Manual ##
+# Supply
+resid1 = lm(ln_fp ~ lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)$res
+resid2 = lm(ln_sp ~ ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)$res
+
+kable(data.frame(supply = summary(lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 + resid1, data=cbind(RSdata,resid1)))$coef["resid1","Pr(>|t|)"],
+                 demand = summary(lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 + resid2, data=cbind(RSdata,resid1)))$coef["resid2","Pr(>|t|)"]),
+      digits=3, caption= "Manual Computation")
+
+```
+
+Difference between OLS and IV not significant for demand equation but signficiant for supply equation
+
+## Supply elasticity for Area
+```{r Area}
+iv3 = ivreg(ln_area ~ ln_fp + trendsp1 + trendsp2 + trendsp3 |
+              lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+kable(data.frame(elasticity=summary(iv3)$coef["ln_fp",1:2]), digits=3, caption = "Table 3. Supply elasticity for Area")
+```
+
+Supply elasticity for area slightly higher than that for total quantity, but are comparable.
+
+## Additional years of data
+```{r ext}
+iv1b = ivreg(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 | lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata.ext)
+iv2b = ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w     + trendsp1 + trendsp2 + trendsp3, data=RSdata.ext)
+kable(rbind(ln_fp = summary(iv1b)$coef["ln_fp",1:2], ln_sp = summary(iv2b)$coef["ln_sp",1:2]), digitis = 3, caption = "Table 4. Additional 7 years of recent data")
+```
+
+Estimates are different but arguably not very different and does not change the main results
+
+## Comments on original datasets
+The orginal datasets and code are provided by the authors in a modular fashion. The authors could have organized the data in a single dataset and provided the code in only one file with indicated sections, which would have made replicating the results a bit easier. But on the other hand, compared to many other authors who provide data and code with little explaination, theirs is relatively complete. 
