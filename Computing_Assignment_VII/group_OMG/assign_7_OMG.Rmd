@@ -57,9 +57,15 @@ Estimating the supply funcion using OLS, we found that excluding ln(w) led to a 
 | | (0.022)|  (0.024)|
 
 
-```{r}
-
 ##3 hausman test
+
+$H_0:$ Price is exogenous
+$H_1:$ Price is endogenous
+
+$\hat\beta^{IV} \xrightarrow{p} \beta$ under both $H_0:$ and $H_1:$
+$\hat\beta^{OLS} \xrightarrow{p} \beta$ under $H_0:$, is more efficient
+
+```{r}
 
 # excluding lnw from OLS
 #homoscedastic case
