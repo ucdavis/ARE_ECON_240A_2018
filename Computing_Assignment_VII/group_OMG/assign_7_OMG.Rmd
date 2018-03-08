@@ -1,6 +1,6 @@
 ---
 title: "Computing Assignment VII"
-author: "group"
+author: "OMG"
 date: "March 9, 2018"
 output: pdf_document
 ---
@@ -66,3 +66,4 @@ IVarea <- ivreg(ln_area~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+tren
 
 ## your document
 Geyi_Hi_I hope that you could see this lol...
+making changes?
