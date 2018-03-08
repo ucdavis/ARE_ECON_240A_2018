@@ -8,10 +8,10 @@ output: pdf_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(AER)
-
+# Problem 1
 RSdata_raw <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")%>% mutate(.,ln_area=log(area))
 RSdata <- na.omit(RSdata_raw)
-# Problem 1
+
 reg_qs<- lm(ln_qs ~ ln_fp+trendsp1+trendsp2+trendsp3, data=RSdata,na.rm=TRUE)
 
 
@@ -64,6 +64,7 @@ We can also carry out the Hausman test another way (as seen in our regression ap
 
 Thus we concluded that controlling for supply shock in the OLS regression reduces the endogeneity problem of measuring the effect of futures price on output supply.
 
+```{r setup, include=FALSE}
 # Problem 4
 
 IV_area<-ivreg(ln_area~ ln_fp + ln_w+ trendsp1+trendsp2 +trendsp3 | ln_fp+ln_w+lag_ln_w+ trendsp1+trendsp2+trendsp3, data=RSdata)
