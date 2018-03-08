@@ -19,8 +19,8 @@ USER
   </p>
   <p class="date">March 6, 2018</p>
 </div>
-<div id="replication-of-robert-and-schlenker" class="slide section level2">
-<h2>Replication of Robert and Schlenker</h2>
+<div id="replication-of-rs-main-results" class="slide section level2">
+<h2>Replication of RS’ main results</h2>
 <table>
 <caption>Table 1a. OLS Estimates</caption>
 <thead>
@@ -28,18 +28,27 @@ USER
 <th></th>
 <th align="right">Estimate</th>
 <th align="right">Std. Error</th>
+<th align="right">Pr(&gt;|t|)</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>ln_fp</td>
-<td align="right">0.023</td>
-<td align="right">0.028</td>
+<td>ln_fp.include</td>
+<td align="right">0.097</td>
+<td align="right">0.013</td>
+<td align="right">0.000</td>
 </tr>
 <tr class="even">
+<td>ln_fp.exclude</td>
+<td align="right">0.023</td>
+<td align="right">0.028</td>
+<td align="right">0.401</td>
+</tr>
+<tr class="odd">
 <td>ln_sp</td>
 <td align="right">-0.020</td>
 <td align="right">0.011</td>
+<td align="right">0.071</td>
 </tr>
 </tbody>
 </table>
@@ -50,82 +59,85 @@ USER
 <th></th>
 <th align="right">Estimate</th>
 <th align="right">Std. Error</th>
+<th align="right">Pr(&gt;|t|)</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td>ln_fp</td>
-<td align="right">0.049</td>
-<td align="right">0.051</td>
+<td align="right">0.103</td>
+<td align="right">0.024</td>
+<td align="right">0.000</td>
 </tr>
 <tr class="even">
 <td>ln_sp</td>
 <td align="right">-0.058</td>
 <td align="right">0.022</td>
+<td align="right">0.013</td>
 </tr>
 </tbody>
 </table>
-<p>The estimates do not match exact to the results of the paper, but in the same ball park, and general results are consistent.</p>
+<ol style="list-style-type: decimal">
+<li>RS excluded ln_w in their OLS model for the supply side.<br />
+</li>
+<li>The estimates do not match exactly to the results of the paper since our data of ln_w is a little bit different from RS’s but still compatible with RS’s results in terms of signs, magnititudes and significances.</li>
+</ol>
 </div>
-<div id="hausman-test-p-value" class="slide section level2">
-<h2>Hausman Test p-value</h2>
+<div id="hausman-test" class="slide section level2">
+<h2>Hausman Test</h2>
+<p>Suppose that<br />
+<span class="math display">\[y_i = x_i'\beta + e_i, \quad E[x_i e_i]=0 (H_0); \quad x_i = \Gamma' z_i + v_i, \quad E[z_i v_i] = E[z_i e_i] = 0\]</span> Then <span class="math display">\[E[x_i e_i] = E[(\Gamma' z_i + v_i) e_i] = \Gamma'E[z_i e_i] + E[v_i e_i] =0\]</span> If <span class="math inline">\(E[x_i e_i] \neq 0\)</span>, then <span class="math inline">\(E[v_i e_i] \neq 0\)</span>. Thus, a linear regression model with OLS can be used to test whether the projection coefficient of <span class="math inline">\(e_i\)</span> over <span class="math inline">\(v_i\)</span> is zero or not as a method to test <span class="math inline">\(E[x_i e_i]=0\)</span>.</p>
 <table>
-<caption>Table 2. Using diagnostics</caption>
+<caption>Husman Test</caption>
 <thead>
 <tr class="header">
-<th align="right">supply</th>
-<th align="right">demand</th>
+<th align="right">ols.exlude</th>
+<th align="right">ols.include</th>
+<th align="right">hausman</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td align="right">0.557</td>
-<td align="right">0.021</td>
+<td align="right">0.001</td>
+<td align="right">0.785</td>
+<td align="right">0.785</td>
 </tr>
 </tbody>
 </table>
-<table>
-<caption>Manual Computation</caption>
-<thead>
-<tr class="header">
-<th align="right">supply</th>
-<th align="right">demand</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="right">0.557</td>
-<td align="right">0.021</td>
-</tr>
-</tbody>
-</table>
-<p>Difference between OLS and IV not significant for demand equation but signficiant for supply equation</p>
+<ol style="list-style-type: decimal">
+<li>If ln_w included, there is no significant difference between OLS and IV.<br />
+</li>
+<li>If ln_w excluded, there is significant difference between OLS and IV.</li>
+</ol>
 </div>
-<div id="supply-elasticity-for-area" class="slide section level2">
-<h2>Supply elasticity for Area</h2>
+<div id="supplemental-results" class="slide section level2">
+<h2>Supplemental results</h2>
+<ol style="list-style-type: decimal">
+<li>Supply elasticity for area</li>
+</ol>
 <table>
 <caption>Table 3. Supply elasticity for Area</caption>
 <thead>
 <tr class="header">
 <th></th>
-<th align="right">elasticity</th>
+<th align="right">Estimate</th>
+<th align="right">Std. Error</th>
+<th align="right">Pr(&gt;|t|)</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>Estimate</td>
-<td align="right">0.070</td>
-</tr>
-<tr class="even">
-<td>Std. Error</td>
-<td align="right">0.021</td>
+<td>ln_fp</td>
+<td align="right">0.081</td>
+<td align="right">0.022</td>
+<td align="right">0.001</td>
 </tr>
 </tbody>
 </table>
-<p>Supply elasticity for area slightly higher than that for total quantity, but are comparable.</p>
-</div>
-<div id="additional-years-of-data" class="slide section level2">
-<h2>Additional years of data</h2>
+<p>The supply elasticity for area is lower than that for total quantity but not that much. In fact, they are comparable in terms of sign, magnititude and significance.</p>
+<ol start="2" style="list-style-type: decimal">
+<li>Impact of additional years of data</li>
+</ol>
 <table>
 <caption>Table 4. Additional 7 years of recent data</caption>
 <thead>
@@ -133,22 +145,25 @@ USER
 <th></th>
 <th align="right">Estimate</th>
 <th align="right">Std. Error</th>
+<th align="right">Pr(&gt;|t|)</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td>ln_fp</td>
-<td align="right">0.0598294</td>
-<td align="right">0.0520093</td>
+<td align="right">0.102</td>
+<td align="right">0.025</td>
+<td align="right">0.000</td>
 </tr>
 <tr class="even">
 <td>ln_sp</td>
-<td align="right">-0.0633188</td>
-<td align="right">0.0233871</td>
+<td align="right">-0.063</td>
+<td align="right">0.023</td>
+<td align="right">0.009</td>
 </tr>
 </tbody>
 </table>
-<p>Estimates are different but arguably not very different and does not change the main results</p>
+<p>Estimates have the same signs as before with only slight differences in terms of magnitudes and significances.</p>
 </div>
 <div id="comments-on-original-datasets" class="slide section level2">
 <h2>Comments on original datasets</h2>
