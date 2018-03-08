@@ -17,7 +17,7 @@ library(AER)
 library(knitr)
 rm(list=ls())
 
-data.all = read.csv("E:/tengda/PhD/courses/winter quarter 2018/Econometrics I/homework/RSdata.csv")  # Location of downloaded dataset
+data.all = read.csv("C:/Users/tluo/Downloads/RSdata.csv")  # Location of downloaded dataset
 # Can we obtain the data using TA's method?
 RSdata.ext = data.all %>% mutate(lag_ln_w=lag(ln_w), ln_area=log(area)) %>% filter(year>=1962)
 RSdata = filter(RSdata.ext, year<=2007)
@@ -92,7 +92,7 @@ iv1b = ivreg(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | ln_w +
 iv2b = ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w + 
              trendsp1 + trendsp2 + trendsp3, data=RSdata.ext)
 
-kable(rbind(ln_fp = summary(iv1b)$coef["ln_fp",-3], ln_sp = summary(iv2b)$coef["ln_sp",-3]), digitis = 3, caption = "Table 4. Additional 7 years of recent data")
+kable(rbind(ln_fp = summary(iv1b)$coef["ln_fp",-3], ln_sp = summary(iv2b)$coef["ln_sp",-3]), digits = 3, caption = "Table 4. Additional 7 years of recent data")
 
 ```
 
