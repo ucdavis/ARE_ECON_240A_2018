@@ -72,6 +72,8 @@ if there is only one parameter.
 Assuming homoskedasticity:$\hat {var}(\hat\beta^{IV}-\hat\beta^{OLS})= var(\hat\beta^{IV})-var(\hat\beta^{OLS})$
 
 
+##Hausman results
+
 ```{r}
 
 # excluding lnw from OLS
@@ -95,8 +97,20 @@ b_ols2=summary(OLSS2)$coef[2,1]
 var_b_ols2=(summary(OLSS2)$coef[2,2])^2
 var_delta_b2=var_b_iv-var_b_ols2
 H2=((b_iv-b_ols2)^2)/var_delta_b2
+```
+
+Our Hausman results testing the OLS without ln(w) against the IV:
+
+$$H= -44.393$$
+
+And the results testing the OLS with ln(w) against the IV:
+
+$$H= 0.076$$
+$$c = 0.670$$  
+We reject the null hypothesis that price is exogenous in the first case and fail to reject in the second.  
 
 
+```{r}
 ###4 Repeat supply model with ln(area) as dependent variable
 ###ln_w is not included 
 dta <- dta %>% mutate(ln_area=log(area)) 
