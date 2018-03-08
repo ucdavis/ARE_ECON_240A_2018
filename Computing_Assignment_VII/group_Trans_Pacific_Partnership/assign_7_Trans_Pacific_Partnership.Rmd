@@ -11,7 +11,7 @@ library(AER)
 
 RSdata_raw <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")%>% mutate(.,ln_area=log(area))
 RSdata <- na.omit(RSdata_raw)
-##1
+# Problem 1
 reg_qs<- lm(ln_qs ~ ln_fp+trendsp1+trendsp2+trendsp3, data=RSdata,na.rm=TRUE)
 
 
@@ -19,7 +19,7 @@ reg_qd<- lm(ln_qd ~ ln_sp +trendsp1+ trendsp2+trendsp3, data=RSdata)
 summary(reg_qs)
 summary(reg_qd)
 
-##2
+# Problem 2
 IV_qs<-ivreg(ln_qs~ ln_fp + ln_w+ trendsp1+trendsp2 +trendsp3 | ln_w+lag_ln_w+ trendsp1+trendsp2+trendsp3, data=RSdata)
 IV_qd<-ivreg(ln_qd~ ln_sp +trendsp1+ trendsp2+trendsp3 |ln_w+ trendsp1+trendsp2+trendsp3, data=RSdata)
 
@@ -64,7 +64,7 @@ We can also carry out the Hausman test another way (as seen in our regression ap
 
 Thus we concluded that controlling for supply shock in the OLS regression reduces the endogeneity problem of measuring the effect of futures price on output supply.
 
-##4
+# Problem 4
 
 IV_area<-ivreg(ln_area~ ln_fp + ln_w+ trendsp1+trendsp2 +trendsp3 | ln_fp+ln_w+lag_ln_w+ trendsp1+trendsp2+trendsp3, data=RSdata)
 summary(IV_area)
@@ -83,7 +83,7 @@ mean(a)
 min(RSdata$ln_qs)
 min(a)
 
-##5
+# Problem 5
 
 RSdata_reduced<- filter(RSdata, year<=2008)
 IV_qs_reduced<-ivreg(ln_qs~ ln_fp + ln_w+ trendsp1+trendsp2 +trendsp3 | ln_w+lag_ln_w+ trendsp1+trendsp2+trendsp3, data=RSdata_reduced)
