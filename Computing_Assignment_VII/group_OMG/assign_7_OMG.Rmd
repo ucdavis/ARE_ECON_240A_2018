@@ -7,7 +7,62 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(AER)
+library(broom)
+library(MASS)
+library(tidyverse)
+dta <- read_csv("https://github.com/ucdavis/ARE_ECON_240A_2018/tree/master/Computing_Assignment_VII/data/RSdata.csv")
+dta<-dta2%>%filter(year<=2007)
+##1 simple OLS
+#lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2,dta)
+#lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp3,dta)
+##supply
+OLSS=lm(ln_qs~ln_fp+trendsp1+trendsp2+trendsp3,dta)
+#a=lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta)
+##demand
+OLSD=lm(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3,dta)
+## dropping the ln_w term gives us somewhat closer value
+
+##2 IV
+## supply model lag of ln_w as IV for ln_fp
+IVS <- ivreg(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta)
+IVD <- ivreg(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3|trendsp1+trendsp2+trendsp3+ln_w,data=dta)
+
+# hausman test
+
+# excluding lnw from OLS
+#homoscedastic case
+b_iv=summary(IVS)$coef[2,1]
+var_b_iv=(summary(IVS)$coef[2,2])^2
+
+b_ols=summary(OLSS)$coef[2,1]
+var_b_ols=(summary(OLSS)$coef[2,2])^2
+
+var_delta_b=var_b_iv-var_b_ols
+H=((b_iv-b_ols)^2)/var_delta_b
+
+critical=pchisq(0.95,1)
+
+#h2 <- hausman.systemfit( fit2sls, fit3sls ) 
+
+# including lnw in OLS
+OLSS2=lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta)
+b_ols2=summary(OLSS2)$coef[2,1]
+var_b_ols2=(summary(OLSS2)$coef[2,2])^2
+var_delta_b2=var_b_iv-var_b_ols2
+H2=((b_iv-b_ols2)^2)/var_delta_b2
+
+
+###4 Repeat supply model with ln(area) as dependent variable
+###ln_w is not included 
+dta <- dta %>% mutate(ln_area=log(area)) 
+olsarea=lm(ln_area~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta) %>% tidy
+IVarea <- ivreg(ln_area~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta) %>% tidy
+
+###5 adding the 7 extra years doesn't seem to change the IV estimates for the supply and demand model. 
+###However, it did seem to affect our Hausmen test results. Whether Ho: price is exogenous or not.
 ```
 
 ## your document
-
+Geyi_Hi_I hope that you could see this lol...

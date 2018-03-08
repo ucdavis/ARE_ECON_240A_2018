@@ -2,12 +2,79 @@
 title: "Computing Assignment VII"
 author: "group"
 date: "March 9, 2018"
-output: pdf_document
+output: ioslides_presentation
+smaller: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+library(tidyverse)
+library(AER)
+library(matlib)
 ```
 
-## your document
+```{r}
+remove(list = ls())
 
+#data
+data_RS <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
+```
+
+## 1. Estimate OLS model
+```{r}
+# OLS supply incl ln_w
+OLS_supply <- lm(ln_qs~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
+summary(OLS_supply)
+  # Coefficient on ln_fp (8.876e-02) same sign, but significant (t=7.628) and half the magnitude
+
+# OLS supply excl ln_w
+OLS_supply_exclw <- lm(ln_qs~ln_fp + trendsp1 + trendsp2 + trendsp3, data=data_RS)
+summary(OLS_supply_exclw)
+
+# OLS demand
+OLS_demand <- lm(ln_qd~ln_sp + trendsp1 + trendsp2 + trendsp3, data=data_RS)
+summary(OLS_demand)
+  # Coefficient on ln_sp same sign, similar magnitude, but insignificant
+```
+
+## 2. Estimate IV model
+```{r}
+IV_supply <- ivreg(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | lag(ln_w) + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
+summary(IV_supply)
+  # Coefficient same sign and similar magnitude, standard error also similar (0.101652)
+
+IV_supply_exclw <- ivreg(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 | lag(ln_w) + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
+summary(IV_supply_exclw)
+
+IV_demand <- ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
+summary(IV_demand)
+  # Coefficient on ln_sup same sign, similar magnitude, similar standard error
+```
+
+## 3. Hausman tests for supply model 
+```{r}
+# full model including ln_w
+beta_diff <- coefficients(OLS_supply) - coefficients(IV_supply)
+cov_diff <- vcov(IV_supply) - vcov(OLS_supply)
+Hs = t(beta_diff) %*% Ginv(cov_diff) %*% beta_diff
+Hs
+
+# model excluding ln_w -- how do we do this when the matrices are different sizes?? 
+beta_diff_exclw <- coefficients(OLS_supply_exclw) - coefficients(IV_supply_exclw)
+cov_diff_exclw <- vcov(IV_supply_exclw) - vcov(OLS_supply_exclw)
+Hs_exclw = t(beta_diff_exclw) %*% Ginv(cov_diff_exclw) %*% beta_diff_exclw
+Hs_exclw
+```
+
+## 4. Supply model w/ area
+```{r}
+OLS_supply_area <- lm(ln_area~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
+summary(OLS_supply_area)
+
+IV_supply_area <- ivreg(ln_area~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | lag(ln_w) + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
+summary(IV_supply_area)
+```
+
+## 5., 6. Comments about canvas vs. RS dataset
