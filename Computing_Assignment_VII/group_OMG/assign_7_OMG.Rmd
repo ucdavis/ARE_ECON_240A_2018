@@ -57,13 +57,20 @@ Estimating the supply funcion using OLS, we found that excluding ln(w) led to a 
 | | (0.022)|  (0.024)|
 
 
-##3 hausman test
+##The Hausman Test
 
-$H_0:$ Price is exogenous
+$H_0:$ Price is exogenous  
 $H_1:$ Price is endogenous
 
-$\hat\beta^{IV} \xrightarrow{p} \beta$ under both $H_0:$ and $H_1:$
-$\hat\beta^{OLS} \xrightarrow{p} \beta$ under $H_0:$, is more efficient
+$\hat\beta^{IV} \xrightarrow{p} \beta$ under both $H_0$ and $H_1$  
+$\hat\beta^{OLS} \xrightarrow{p} \beta$ under $H_0:$, is more efficient.
+
+$H=(\hat\beta^{IV}-\hat\beta^{OLS})'(\hat {var}(\hat\beta^{IV}-\hat\beta^{OLS}))^{-1}(\hat\beta^{IV}-\hat\beta^{OLS})$
+$= \frac{(\hat\beta^{IV}-\hat\beta^{OLS})^2}{\hat {var}(\hat\beta^{IV}-\hat\beta^{OLS})}$
+if there is only one parameter.  
+
+Assuming homoskedasticity:$\hat {var}(\hat\beta^{IV}-\hat\beta^{OLS})= var(\hat\beta^{IV})-var(\hat\beta^{OLS})$
+
 
 ```{r}
 
