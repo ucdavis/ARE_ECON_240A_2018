@@ -58,7 +58,7 @@ kable(cbind(summary(OLS_demand)$coefficients,summary(IV_demand)$coefficients), c
   add_header_above(c(" ", "OLS" = 4, "IV" = 4))
 ```
 
-## Estimate OLS and IV: ln_w as instrument only {.smaller}
+## Estimate OLS and IV: excl. ln_w {.smaller}
 If we exclude the yield shock from the OLS model and include it only as an instrument in the IV model, our OLS estimate of the supply elasticity becomes closer to RS: now 0.38 with a s.e. of 0.24. The IV estimates also change as the yield shock is included only as an instrument and not as a control in the main regression -- the estimate is now -0.072 with s.e. 0.55. This is not surprising because ln_w was highly significant in the full model, so removing it will result in the estimates being biased.
 ```{r}
 kable(cbind(summary(OLS_supply_exclw)$coefficients,summary(IV_supply_exclw)$coefficients), caption = "Supply", digits = 3, format = "html") %>%
@@ -67,6 +67,7 @@ kable(cbind(summary(OLS_supply_exclw)$coefficients,summary(IV_supply_exclw)$coef
 ```
 
 ## Hausman tests for supply model 
+The Chi-sq critical value for 5% significance with 6 d.f. (full model) is 12.59, and with 5 d.f. (model without ln_w) is 11.07. Therefore in neither case do we reject the null that OLS is consistent and efficient. 
 ```{r include=FALSE}
 # full model including ln_w
 beta_diff <- coefficients(OLS_supply) - coefficients(IV_supply)
@@ -86,6 +87,7 @@ kable(t(c(Hs, Hs_exclw)), col.names = c("Full model", "Without ln_w"), digits = 
 
  
 ## Supply model w/ area instead of total quantity {.smaller}
+We see that the estimated area elasticity is smaller (0.07) than the supply elasticity, which is in like with Roberts & Schlenker, and our point estimates are similar to theirs as well. 
 ```{r include=FALSE}
 data_RS <- mutate(data_RS, ln_area = log(area))
 
@@ -103,6 +105,8 @@ kable(cbind(summary(OLS_supply_area)$coefficients,summary(IV_supply_area)$coeffi
 ```
 
 ## What happens if we exclude the extra 7 years of data? {.smaller}
+
+If we re-run the full supply model excluding the 2008-2014 data, the OLS and IV estimates barely change.  Our OLS estimate was 0.089 before with s.e. 0.012 and now it is 0.097 with s.e. 0.013. Our IV estimate was 0.102 before with s.e. 0.025 and now it is 0.103 with s.e. 0.024.
 ```{r include=FALSE}
 OLS_supply_RS <- lm(ln_qs~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data=filter(data_RS, year<2008))
 
@@ -115,4 +119,5 @@ kable(cbind(summary(OLS_supply_RS)$coefficients,summary(IV_supply_RS)$coefficien
   add_header_above(c(" ", "OLS" = 4, "IV" = 4))
 ```
 
-## Comments on organization of Canvas vs. RS dataset
+## Comments on organization of Canvas vs. RS dataset {.smaller}
+The RS data must be constructed by running a sequence of do files and merging datasets. This is helpful in that it is transparent and allows us to see how each of the variables are constructed. However, the canvas data is cleaner for running these specific regressions because from the RS dataset it is difficult to tell in which ultimate form the data are being used. 
