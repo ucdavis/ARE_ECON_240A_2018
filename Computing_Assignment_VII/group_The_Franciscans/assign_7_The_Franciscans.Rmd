@@ -1,6 +1,6 @@
 ---
 title: "Computing Assignment VII"
-author: "group"
+author: "The Franciscans"
 date: "March 9, 2018"
 output: ioslides_presentation
 smaller: true
@@ -13,17 +13,17 @@ library(knitr)
 library(tidyverse)
 library(AER)
 library(matlib)
+library(kableExtra)
 ```
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 remove(list = ls())
 
 #data
 data_RS <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
 ```
 
-## 1. Estimate OLS model
-```{r}
+```{r include=FALSE}
 # OLS supply incl ln_w
 OLS_supply <- lm(ln_qs~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
 summary(OLS_supply)
@@ -39,8 +39,7 @@ summary(OLS_demand)
   # Coefficient on ln_sp same sign, similar magnitude, but insignificant
 ```
 
-## 2. Estimate IV model
-```{r}
+```{r include=FALSE}
 IV_supply <- ivreg(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | lag(ln_w) + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
 summary(IV_supply)
   # Coefficient same sign and similar magnitude, standard error also similar (0.101652)
@@ -53,8 +52,27 @@ summary(IV_demand)
   # Coefficient on ln_sup same sign, similar magnitude, similar standard error
 ```
 
-## 3. Hausman tests for supply model 
+## Estimate OLS and IV: full model {.smaller}
+
 ```{r}
+kable(cbind(summary(OLS_supply)$coefficients,summary(IV_supply)$coefficients), caption = "Supply", digits = 3, format = "html") %>%
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" ", "OLS" = 4, "IV" = 4))
+
+kable(cbind(summary(OLS_demand)$coefficients,summary(IV_demand)$coefficients), caption = "Demand", digits = 3, format = "html") %>%
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" ", "OLS" = 4, "IV" = 4))
+```
+
+## Estimate OLS and IV: ln_w as instrument only {.smaller}
+```{r}
+kable(cbind(summary(OLS_supply_exclw)$coefficients,summary(IV_supply_exclw)$coefficients), caption = "Supply", digits = 3, format = "html") %>%
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" ", "OLS" = 4, "IV" = 4))
+```
+
+## Hausman tests for supply model 
+```{r include=FALSE}
 # full model including ln_w
 beta_diff <- coefficients(OLS_supply) - coefficients(IV_supply)
 cov_diff <- vcov(IV_supply) - vcov(OLS_supply)
@@ -68,8 +86,16 @@ Hs_exclw = t(beta_diff_exclw) %*% Ginv(cov_diff_exclw) %*% beta_diff_exclw
 Hs_exclw
 ```
 
-## 4. Supply model w/ area
-```{r}
+```{r echo=FALSE}
+kable(t(c(Hs, Hs_exclw)), col.names = c("Full model", "Without ln_w"), digits = 3, caption = "Hausman tests for OLS vs. IV", format = "html") %>%
+  kable_styling(full_width = F) 
+```
+
+ 
+## Supply model w/ area instead of total quantity {.smaller}
+```{r include=FALSE}
+data_RS <- mutate(data_RS, ln_area = log(area))
+
 OLS_supply_area <- lm(ln_area~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
 summary(OLS_supply_area)
 
@@ -77,4 +103,10 @@ IV_supply_area <- ivreg(ln_area~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | 
 summary(IV_supply_area)
 ```
 
-## 5., 6. Comments about canvas vs. RS dataset
+```{r echo=FALSE}
+kable(cbind(summary(OLS_supply_area)$coefficients,summary(IV_supply_area)$coefficients), caption = "Supply", digits = 3, format = "html") %>%
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" ", "OLS" = 4, "IV" = 4))
+```
+
+## Comments about canvas vs. RS dataset {.smaller}
