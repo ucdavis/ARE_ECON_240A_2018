@@ -109,6 +109,7 @@ $$H= 0.076$$
 $$c = 0.670$$  
 We reject the null hypothesis that price is exogenous in the first case and fail to reject in the second.  
 
+##Supply Elasticity for Area, Full Dataset
 
 ```{r}
 ###4 Repeat supply model with ln(area) as dependent variable
@@ -116,10 +117,22 @@ We reject the null hypothesis that price is exogenous in the first case and fail
 dta <- dta %>% mutate(ln_area=log(area)) 
 olsarea=lm(ln_area~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta) %>% tidy
 IVarea <- ivreg(ln_area~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta) %>% tidy
+```
 
+Put in comments on #4 here + maybe a few numbers!
+
+```{r}
 ###5 adding the 7 extra years doesn't seem to change the IV estimates for the supply and demand model. 
 ###However, it did seem to affect our Hausmen test results. Whether Ho: price is exogenous or not.
 ```
 
-## your document
-Geyi_Hi_I hope that you could see this lol...
+Add a few results for #5 here!
+
+Adding the 7 extra years doesn't seem to change the IV estimates for the supply and demand model. However, it did seem to affect our Hausmen test results for Whether Ho: price is exogenous or not.
+
+## Comments on the online dataset
+
+It is inconvenient to post data in .dta format.  
+They included their raw data, enabling other researchers to replicate their work.
+
+Will add more....
