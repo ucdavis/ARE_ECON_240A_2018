@@ -26,6 +26,43 @@ IV_qd<-ivreg(ln_qd~ ln_sp +trendsp1+ trendsp2+trendsp3 |ln_w+ trendsp1+trendsp2+
 summary(IV_qs)
 summary(IV_qd)
 
+# Problem 3
+
+# Excluding "ln_w."
+reg_3_ex_1st <- lm(ln_fp ~ lag_ln_w + ln_w + trendsp1 + trendsp2 + trendsp3, data = RSdata)
+reg_3_ex_residual <- residuals(reg_3_ex_1st) %>% as.data.frame() %>% `colnames<-`(c("reg_3_ex_residual"))
+RSdata <- cbind(RSdata, reg_3_ex_residual)
+
+reg_3_ex_2nd <- lm(ln_qs ~ ln_fp + reg_3_ex_residual + trendsp1 + trendsp2 + trendsp3, data = RSdata)
+
+# Including "ln_w."
+reg_3_in_1st <- lm(ln_fp ~ lag_ln_w + ln_w + trendsp1 + trendsp2 + trendsp3, data = RSdata)
+reg_3_in_residual <- residuals(reg_3_in_1st) %>% as.data.frame() %>% `colnames<-`(c("reg_3_in_residual"))
+RSdata <- cbind(RSdata, reg_3_in_residual)
+
+reg_3_in_2nd <- lm(ln_qs ~ ln_fp + ln_w + reg_3_in_residual + trendsp1 + trendsp2 + trendsp3, data = RSdata)
+
+
+summary(reg_3_ex_2nd)
+summary(reg_3_in_2nd)
+```
+We can now calculate a Hausman test statistic for the cases of including and excluding ln_w from the OLS regression compared to the IV regression, to see whether endogeneity is present in either case. Let $\hat{\beta}_1$ represent OLS coefficient without ln_w and $\hat{\beta}_2$ represent OLS coefficient with ln_2. Let $\tilde{\beta}$ represent IV coefficient. 
+
+Our first test is:
+$H_O$: $H = ($\hat{\beta}_1$- $\tilde{\beta}$)^2/(\hat{s}_1^2 - \tilde{s}^2) = 0$
+$H_a$: $H \neq 0$
+
+Using results from our OLS and IV regression we get a test statistic of $H = 194.153$, which is $\chi^2(1)$ distributed, and is much higher than the critical value of 3.84. Thus we reject the null hypothesis and suspect that endogeneity is present.
+
+Our second test is:
+$H_O$: $H = ($\hat{\beta}_2$- $\tilde{\beta}$)^2/(\hat{s}_2^2 - \tilde{s}^2) = 0$
+$H_a$: $H \neq 0$
+
+The result is H = 0.48, which is less than critical value 3.84, thus we do not reject the null hypothesis, and we have less evidence of endogeneity.
+
+We can also carry out the Hausman test another way (as seen in our regression approach) by regressing supply on the residuals of the original regression (either with or without ln_w) and testing whether the coefficient on the residuals is different from zero. Through this approach we find equivalent results, with $t = 2.99 > 1.96$ when ln_w is excluded and $t = -0.71 > -1.96$ when ln_w is included in the OLS regression. 
+
+Thus we concluded that controlling for supply shock in the OLS regression reduces the endogeneity problem of measuring the effect of futures price on output supply.
 
 ##4
 
