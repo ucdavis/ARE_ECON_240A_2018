@@ -25,37 +25,43 @@ dta<-dta2%>%filter(year<=2007)
 
 ## Simple OLS and IV
 
-```{r include=FALSE}
+```{r echo=FALSE}
 
 #lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2,dta)
 #lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp3,dta)
 ##supply
-OLSS=lm(ln_qs~ln_fp+trendsp1+trendsp2+trendsp3,dta)
-OLSSw=lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta)
+OLSSt=lm(ln_qs~ln_fp+trendsp1+trendsp2+trendsp3,dta)%>% tidy
+tOLSS <- OLSSt[-c(1, 3, 4, 5), ]
+OLSS2t=lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta)%>% tidy
+tOLSS2 <- OLSS2t[-c(1, 3, 4, 5, 6), ]
 #a=lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta)
 ##demand
-OLSD=lm(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3,dta)
+OLSDt=lm(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3,dta)%>% tidy
+tOLSD <- OLSDt[-c(1, 3, 4, 5), ]
 ## dropping the ln_w term gives us somewhat closer value
+
+IVSt <- ivreg(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta)%>% tidy
+tIVS <- IVSt[-c(1, 3, 4, 5, 6), ]
+
+IVDt <- ivreg(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3|trendsp1+trendsp2+trendsp3+ln_w,data=dta)%>% tidy
+tIVD <- IVDt[-c(1, 3, 4, 5, 6), ]
+
+
+OLSIVtable <- rbind(tOLSS, tOLSS2, tOLSD, tIVS, tIVD)
+
+kable(OLSIVtable)
+
 
 ##2. IV
 ## supply model lag of ln_w as IV for ln_fp
-IVS <- ivreg(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta)
-IVD <- ivreg(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3|trendsp1+trendsp2+trendsp3+ln_w,data=dta)
+#IVS <- ivreg(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta)
+#IVD <- ivreg(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3|trendsp1+trendsp2+trendsp3+ln_w,data=dta)
 
 ```
 
 Estimating the supply funcion using OLS, we found that excluding ln(w) led to a result more similar to the paper.  
 
-|OLS |demand | supply |supply, with ln(w) |
-|--:|----:|---------:|----:|
-| | -0.021| 0.023|0.097|
-| | (0.011)| (0.027)|(0.013)|
-
-|IV |demand | supply, with ln(w) |
-|--:|----:|---------:|
-| | -0.059| 0.010|
-| | (0.022)|  (0.024)|
-
+(OLS s, OLS s with ln(w), OLS D, IV S, IV D)
 
 ##The Hausman Test
 
@@ -78,6 +84,9 @@ Assuming homoskedasticity:$\hat {var}(\hat\beta^{IV}-\hat\beta^{OLS})= var(\hat\
 
 # excluding lnw from OLS
 #homoscedastic case
+OLSS=lm(ln_qs~ln_fp+trendsp1+trendsp2+trendsp3,dta)
+IVS <- ivreg(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta)
+
 b_iv=summary(IVS)$coef[2,1]
 var_b_iv=(summary(IVS)$coef[2,2])^2
 
@@ -93,6 +102,7 @@ critical=pchisq(0.95,1)
 
 # including lnw in OLS
 OLSS2=lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta)
+
 b_ols2=summary(OLSS2)$coef[2,1]
 var_b_ols2=(summary(OLSS2)$coef[2,2])^2
 var_delta_b2=var_b_iv-var_b_ols2
@@ -120,6 +130,8 @@ IVarea <- ivreg(ln_area~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+tren
 ```
 
 Put in comments on #4 here + maybe a few numbers!
+
+**why do you say "l_w is not included?"
 
 ```{r}
 ###5 adding the 7 extra years doesn't seem to change the IV estimates for the supply and demand model. 
