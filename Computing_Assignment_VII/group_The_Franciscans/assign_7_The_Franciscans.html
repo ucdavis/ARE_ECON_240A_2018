@@ -99,6 +99,8 @@
 
 <slide class=""><hgroup><h2>Estimate OLS and IV: full model</h2></hgroup><article  id="estimate-ols-and-iv-full-model" class="smaller">
 
+Using OLS, our estimated supply elasticity is the same sign as but four times as large as the RS estimate (0.089 vs. 0.020), and highly significant where theirs is not. Using IV, our estimate is very similar to the RS estimate: 0.102 vs. 0.096 with the same s.e. (0.025).
+
 <table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
 
 <caption>
@@ -543,6 +545,10 @@ trendsp3
 
 </table>
 
+</article></slide><slide class=""><hgroup><h2>Estimate OLS and IV: full model</h2></hgroup><article  id="estimate-ols-and-iv-full-model-1" class="smaller">
+
+Using OLS, our estimated demand elasticity is very close to the RS estimate: -0.017 vs. -0.018 with s.e. of 0.011 vs. 0.010. Using IV, our estimate is also very similar: -0.063 vs. -0.055 with s.e.of 0.023 vs. 0.024.
+
 <table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
 
 <caption>
@@ -929,7 +935,9 @@ trendsp3
 
 </table>
 
-</article></slide><slide class=""><hgroup><h2>Estimate OLS and IV: ln_w as instrument only</h2></hgroup><article  id="estimate-ols-and-iv-ln_w-as-instrument-only" class="smaller">
+</article></slide><slide class=""><hgroup><h2>Estimate OLS and IV: excl. ln_w</h2></hgroup><article  id="estimate-ols-and-iv-excl.-ln_w" class="smaller">
+
+If we exclude the yield shock from the OLS model and include it only as an instrument in the IV model, our OLS estimate of the supply elasticity becomes closer to RS: now 0.38 with a s.e. of 0.24. The IV estimates also change as the yield shock is included only as an instrument and not as a control in the main regression &#8211; the estimate is now -0.072 with s.e. 0.55. This is not surprising because ln_w was highly significant in the full model, so removing it will result in the estimates being biased.
 
 <table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
 
@@ -1815,7 +1823,453 @@ trendsp3
 
 </table>
 
-</article></slide><slide class=""><hgroup><h2>Comments about canvas vs. RS dataset</h2></hgroup><article  id="comments-about-canvas-vs.-rs-dataset" class="smaller"></article></slide>
+</article></slide><slide class=""><hgroup><h2>What happens if we exclude the extra 7 years of data?</h2></hgroup><article  id="what-happens-if-we-exclude-the-extra-7-years-of-data" class="smaller">
+
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+
+<caption>
+
+Supply, data through 2007
+
+</caption>
+
+<thead>
+
+<tr>
+
+<th style="border-bottom:hidden" colspan="1">
+
+</th>
+
+<th style="text-align:center; border-bottom:hidden; padding-bottom:0; padding-left:3px;padding-right:3px;" colspan="4">
+
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+OLS</div>
+
+</th>
+
+<th style="text-align:center; border-bottom:hidden; padding-bottom:0; padding-left:3px;padding-right:3px;" colspan="4">
+
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+IV</div>
+
+</th>
+
+</tr>
+
+<tr>
+
+<th style="text-align:left;">
+
+</th>
+
+<th style="text-align:right;">
+
+Estimate
+
+</th>
+
+<th style="text-align:right;">
+
+Std. Error
+
+</th>
+
+<th style="text-align:right;">
+
+t value
+
+</th>
+
+<th style="text-align:right;">
+
+Pr(&gt;|t|)
+
+</th>
+
+<th style="text-align:right;">
+
+Estimate
+
+</th>
+
+<th style="text-align:right;">
+
+Std. Error
+
+</th>
+
+<th style="text-align:right;">
+
+t value
+
+</th>
+
+<th style="text-align:right;">
+
+Pr(&gt;|t|)
+
+</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+<tr>
+
+<td style="text-align:left;">
+
+(Intercept)
+
+</td>
+
+<td style="text-align:right;">
+
+-61.337
+
+</td>
+
+<td style="text-align:right;">
+
+1.433
+
+</td>
+
+<td style="text-align:right;">
+
+-42.815
+
+</td>
+
+<td style="text-align:right;">
+
+0.000
+
+</td>
+
+<td style="text-align:right;">
+
+-61.695
+
+</td>
+
+<td style="text-align:right;">
+
+1.832
+
+</td>
+
+<td style="text-align:right;">
+
+-33.670
+
+</td>
+
+<td style="text-align:right;">
+
+0.000
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+ln_fp
+
+</td>
+
+<td style="text-align:right;">
+
+0.097
+
+</td>
+
+<td style="text-align:right;">
+
+0.013
+
+</td>
+
+<td style="text-align:right;">
+
+7.481
+
+</td>
+
+<td style="text-align:right;">
+
+0.000
+
+</td>
+
+<td style="text-align:right;">
+
+0.103
+
+</td>
+
+<td style="text-align:right;">
+
+0.024
+
+</td>
+
+<td style="text-align:right;">
+
+4.226
+
+</td>
+
+<td style="text-align:right;">
+
+0.000
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+ln_w
+
+</td>
+
+<td style="text-align:right;">
+
+1.311
+
+</td>
+
+<td style="text-align:right;">
+
+0.097
+
+</td>
+
+<td style="text-align:right;">
+
+13.533
+
+</td>
+
+<td style="text-align:right;">
+
+0.000
+
+</td>
+
+<td style="text-align:right;">
+
+1.353
+
+</td>
+
+<td style="text-align:right;">
+
+0.117
+
+</td>
+
+<td style="text-align:right;">
+
+11.538
+
+</td>
+
+<td style="text-align:right;">
+
+0.000
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+trendsp1
+
+</td>
+
+<td style="text-align:right;">
+
+0.035
+
+</td>
+
+<td style="text-align:right;">
+
+0.001
+
+</td>
+
+<td style="text-align:right;">
+
+47.869
+
+</td>
+
+<td style="text-align:right;">
+
+0.000
+
+</td>
+
+<td style="text-align:right;">
+
+0.035
+
+</td>
+
+<td style="text-align:right;">
+
+0.001
+
+</td>
+
+<td style="text-align:right;">
+
+37.275
+
+</td>
+
+<td style="text-align:right;">
+
+0.000
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+trendsp2
+
+</td>
+
+<td style="text-align:right;">
+
+-0.012
+
+</td>
+
+<td style="text-align:right;">
+
+0.003
+
+</td>
+
+<td style="text-align:right;">
+
+-3.536
+
+</td>
+
+<td style="text-align:right;">
+
+0.001
+
+</td>
+
+<td style="text-align:right;">
+
+-0.011
+
+</td>
+
+<td style="text-align:right;">
+
+0.005
+
+</td>
+
+<td style="text-align:right;">
+
+-2.250
+
+</td>
+
+<td style="text-align:right;">
+
+0.030
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+trendsp3
+
+</td>
+
+<td style="text-align:right;">
+
+0.009
+
+</td>
+
+<td style="text-align:right;">
+
+0.009
+
+</td>
+
+<td style="text-align:right;">
+
+0.991
+
+</td>
+
+<td style="text-align:right;">
+
+0.327
+
+</td>
+
+<td style="text-align:right;">
+
+0.008
+
+</td>
+
+<td style="text-align:right;">
+
+0.014
+
+</td>
+
+<td style="text-align:right;">
+
+0.614
+
+</td>
+
+<td style="text-align:right;">
+
+0.543
+
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</article></slide><slide class=""><hgroup><h2>Comments on organization of Canvas vs. RS dataset</h2></hgroup><article  id="comments-on-organization-of-canvas-vs.-rs-dataset"></article></slide>
 
 
   <slide class="backdrop"></slide>
