@@ -2,34 +2,64 @@
 title: "Computing Assignment VII"
 author: "OMG"
 date: "March 9, 2018"
-output: pdf_document
+output: ioslides_presentation
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
 library(tidyverse)
 library(AER)
 library(broom)
 library(MASS)
 library(tidyverse)
-dta <- read_csv("https://github.com/ucdavis/ARE_ECON_240A_2018/tree/master/Computing_Assignment_VII/data/RSdata.csv")
+library(knitr)
+setwd("..")
+dta2 <- read_csv("data/RSdata.csv")
+#dta <- read_csv("https://github.com/ucdavis/ARE_ECON_240A_2018/tree/master/Computing_Assignment_VII/data/RSdata.csv")
 dta<-dta2%>%filter(year<=2007)
-##1 simple OLS
+```
+
+## Simple OLS and IV
+
+```{r include=FALSE}
+
 #lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2,dta)
 #lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp3,dta)
 ##supply
 OLSS=lm(ln_qs~ln_fp+trendsp1+trendsp2+trendsp3,dta)
+OLSSw=lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta)
 #a=lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta)
 ##demand
 OLSD=lm(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3,dta)
 ## dropping the ln_w term gives us somewhat closer value
 
-##2 IV
+##2. IV
 ## supply model lag of ln_w as IV for ln_fp
 IVS <- ivreg(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta)
 IVD <- ivreg(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3|trendsp1+trendsp2+trendsp3+ln_w,data=dta)
 
-# hausman test
+```
+
+Estimating the supply funcion using OLS, we found that excluding ln(w) led to a result more similar to the paper.  
+
+|OLS |demand | supply |supply, with ln(w) |
+|--:|----:|---------:|----:|
+| | -0.021| 0.023|0.097|
+| | (0.011)| (0.027)|(0.013)|
+
+|IV |demand | supply, with ln(w) |
+|--:|----:|---------:|
+| | -0.059| 0.010|
+| | (0.022)|  (0.024)|
+
+
+```{r}
+
+##3 hausman test
 
 # excluding lnw from OLS
 #homoscedastic case
@@ -66,4 +96,3 @@ IVarea <- ivreg(ln_area~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+tren
 
 ## your document
 Geyi_Hi_I hope that you could see this lol...
-making changes?
