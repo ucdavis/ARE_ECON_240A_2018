@@ -96,6 +96,106 @@ rownames(results.all) <- c("$\\beta_{s(OLS)}$","$\\beta_{s(IV)}$","$\\omega_{t(I
 kable(results.all, caption = "Regression results")
 ```
 
+#Hausman Test for Endogeneity
+```{r Hausmansetup, include=FALSE}
+#Note that this large block is setup lifted straight out of dan's work.
+rm(list = ls())
+cat("\014")
+
+library(stargazer)
+library(tidyverse)
+library(readr)
+library(AER)
+library(knitr)
+library(broom)
+library(dplyr)
+
+#RSdata <- read_csv("S:/Graduates/dmather/240a/redSlothPS7/RSdata.csv")
+RSdata <- read_csv("~/Documents/Classes/Winter 2017/ECN 240A Econometrics/Section/PS7/RSdata.csv")
+
+# OLS models
+
+# supply model
+supplyOLS <- lm(data = RSdata, ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3)
+supplyOLS_lnw <- lm(data = RSdata, ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3)
+
+summary(supplyOLS)
+
+# demand model
+demandOLS <- lm(data = RSdata, ln_qd ~ ln_sp + trendsp1+ trendsp2+ trendsp3)
+
+summary(demandOLS)
+
+# The OLS coefficient for supply elasticity is XXX, which is somewhat close to the coefficient estimated in RS (XXX). Similary, the demand coefficients are similar as well (XXX vs. XXX). The authors, RS, use the OLS model to highlight the endogeneity of the price, which is shown through the likely underestimated supply elasticity and the likely overestimated demand elasticity. They estimate the OLS regressions without instrumenting prices, which is why the term ln_w is not included in the regression here.
+
+# IV models
+
+#supply model
+supplyIV.firststage <- lm(data = RSdata, formula = ln_fp ~ lag_ln_w + ln_w + trendsp1 + trendsp2 + trendsp3)
+
+supplyIV <- ivreg(data = RSdata, formula = ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | trendsp1 + trendsp2 + trendsp3 + ln_w + lag_ln_w)
+
+supplyIV_nolnw <- ivreg(data = RSdata, formula = ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 | trendsp1 + trendsp2 + trendsp3 + ln_w + lag_ln_w)
+
+
+us <- c(coef(summary(supplyIV))["ln_fp","Estimate"], +
+  coef(summary(supplyIV))["ln_fp","Std. Error"], +
+  coef(summary(supplyIV))["ln_w","Estimate"], +
+  coef(summary(supplyIV))["ln_w","Std. Error"], +
+  coef(summary(supplyIV.firststage))["lag_ln_w","Estimate"], +
+  coef(summary(supplyIV.firststage))["lag_ln_w","Std. Error"], +
+  coef(summary(supplyIV.firststage))["ln_w","Estimate"], +
+  coef(summary(supplyIV.firststage))["ln_w","Std. Error"])
+
+rs <- c(0.096, 0.025, 1.229, 0.138, -3.628, 0.945, -2.276, 1.294)
+
+compare.supplyIV <- data.frame(US = us, RS = rs)
+row.names(compare.supplyIV) <- c("Supply elas.", "(std. error)", "Shock w(t)", "(std. error2)", "First stage w(t-1)", "(std. error3)", "First stage w(t)", "std. error4")
+
+# demand model
+
+demandIV.firststage <- lm(data = RSdata, formula = ln_sp ~ ln_w + trendsp1 + trendsp2 + trendsp3)
+
+summary(demandIV.firststage)
+
+demandIV <- ivreg(data = RSdata, formula = ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | trendsp1 + trendsp2 + trendsp3 + ln_w)
+
+summary(demandIV)
+
+# Our estimates of the supply and demand elasticities are similar to those in the RS paper.
+```
+
+
+```{r include =FALSE}
+#This block is more hausman-specific setup from dan's work
+library(MASS)
+require(Matrix)
+#per Hausman's original paper, we assume cov(B^IV, B^OLS) is zero and that our sample variance is an unbiased estimator of asymptotic variance. This may not be a reliable assumption in all cases.
+
+hausman <- function(betaiv, iv, betaols,ols) {
+  stat <- t(betaols - betaiv)%*%ginv(vcov(iv)-vcov(ols))%*%(betaols-betaiv)
+  rank <- rankMatrix(vcov(iv)-vcov(ols))
+  chisq <- qchisq(0.95,df=rank)
+  return(cbind(stat,chisq))
+  
+}
+
+hausman_supplyIV <- hausman(supplyIV$coefficients, supplyIV ,supplyOLS_lnw$coefficients,supplyOLS_lnw)
+
+hausman_supplyIV_nolnw <-  hausman(supplyIV_nolnw$coefficients,supplyIV_nolnw,supplyOLS$coefficients,supplyOLS)
+
+hausman_demandOLS <- hausman(demandIV$coefficients,demandIV,demandOLS$coefficients,demandOLS)
+```
+```{r echo = FALSE}
+#Display's Dan's results
+print("Supply IV Hausman")
+hausman_supplyIV
+print("Supply IV Hausman (no lnw)")
+hausman_supplyIV_nolnw
+print("Demand OLS Hausman")
+hausman_demandOLS
+
+```
 #Question 4
 ```{r q4, results='asis', echo=FALSE}
 RSdata$ln_a <- log(RSdata$area)
