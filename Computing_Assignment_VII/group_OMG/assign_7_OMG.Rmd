@@ -179,12 +179,15 @@ kable(table5)
 
 Adding the 7 extra years doesn't seem to change the IV estimates for the supply and demand model. 
 
-##Pubished Data
+##Published Data
 
-It is inconvenient to post data in .dta format, since researchers who do not use stata are then unable to replicate their work.
+It is inconvenient to post data in .dta format, since researchers who do not use stata are then unable to replicate the work.
 
 
-They included their raw data, enabling other researchers to replicate their work.
+Otherwise, their data organization is good.  They include:  
+- raw data, study datasets, and .do files to show changes  
+- clear labels on data within stata  
+- .do files for regressions and figures with clear comments and notes
 
-Will add more....
+Their work is clearly documented and could be replicated.  
 
