@@ -96,6 +96,9 @@ rownames(results.all) <- c("$\\beta_{s(OLS)}$","$\\beta_{s(IV)}$","$\\omega_{t(I
 kable(results.all, caption = "Regression results")
 ```
 
+#OLS/IV Regressions Comment
+One substantial difference is the estimate of supply elasticity from the OLS regression. Here our estimate is much higher than RS. This is because we include the weather (or yield) shock, while RS only use the uninstrumented price. \textbf{Removing $\boldsymbol{\omega_t}$ lowers $\boldsymbol{\beta_{s(OLS)}}$ to 0.038.}
+
 #Hausman Test for Endogeneity
 ```{r Hausmansetup, include=FALSE}
 #Note that this large block is setup lifted straight out of dan's work.
@@ -196,7 +199,7 @@ print("Demand OLS Hausman")
 hausman_demandOLS
 
 ```
-#Question 4
+#Alternate Variable for Supply
 ```{r q4, results='asis', echo=FALSE}
 RSdata$ln_a <- log(RSdata$area)
 RSdata$ln_y <- log(RSdata$yield_shock)
@@ -207,8 +210,6 @@ supplyIV.yield <- ivreg(data = RSdata, formula = ln_y ~ ln_fp + ln_w + trendsp1 
 
 stargazer(supplyIV.area, supplyIV.yield, header = FALSE, keep = c("ln_fp","ln_w"), title = "Using Area or Yield for Supply", font.size="small")
 ```
-#Q4 Comment
-One substantial difference is the estimate of supply elasticity from the OLS regression. Here our estimate is much higher than RS. This is because we include the weather (or yield) shock, while RS only use the uninstrumented price. \textbf{Removing $\boldsymbol{\omega_t}$ lowers $\boldsymbol{\beta_{s(OLS)}}$ to 0.038.}
 
 
 #Question 5 and 6
