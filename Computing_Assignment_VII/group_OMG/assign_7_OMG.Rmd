@@ -48,6 +48,7 @@ tIVD <- IVDt[-c(1, 3, 4, 5, 6), ]
 
 
 OLSIVtable <- rbind(tOLSS, tOLSS2, tOLSD, tIVS, tIVD)
+rownames(OLSIVtable)= c("OLS S", "OLS S with ln(w)", "OLS D", "IV S", "IV D")
 
 kable(OLSIVtable)
 
@@ -61,26 +62,29 @@ kable(OLSIVtable)
 
 Estimating the supply funcion using OLS, we found that excluding ln(w) led to a result more similar to the paper.  
 
-(OLS s, OLS s with ln(w), OLS D, IV S, IV D)
+
 
 ##The Hausman Test
 
-$H_0:$ Price is exogenous  
+$H_0:$ Price(ln_fp) is exogenous  
 $H_1:$ Price is endogenous
 
 $\hat\beta^{IV} \xrightarrow{p} \beta$ under both $H_0$ and $H_1$  
-$\hat\beta^{OLS} \xrightarrow{p} \beta$ under $H_0:$, is more efficient.
+$\hat\beta^{OLS} \xrightarrow{p} \beta$ only if $H_0$ is true but is more efficient than $\hat\beta_{IV}$.  
 
-$H=(\hat\beta^{IV}-\hat\beta^{OLS})'(\hat {var}(\hat\beta^{IV}-\hat\beta^{OLS}))^{-1}(\hat\beta^{IV}-\hat\beta^{OLS})$
-$= \frac{(\hat\beta^{IV}-\hat\beta^{OLS})^2}{\hat {var}(\hat\beta^{IV}-\hat\beta^{OLS})}$
-if there is only one parameter.  
+assuming homoskedasticity:
+Then we have $\hat {var}(\hat\beta^{IV}-\hat\beta^{OLS})= var(\hat\beta^{IV})-var(\hat\beta^{OLS})$  
+as $cov(\hat \beta^{IV},\hat \beta^{OLS})=var(\hat \beta^{OLS})$  
 
-Assuming homoskedasticity:$\hat {var}(\hat\beta^{IV}-\hat\beta^{OLS})= var(\hat\beta^{IV})-var(\hat\beta^{OLS})$
+$H=(\hat \beta^{IV}-\hat \beta^{OLS})'[\hat{var}(\hat \beta^{IV})-\hat{var}(\hat \beta^{OLS})]^{-1}(\hat \beta^{IV}-\hat \beta^{OLS})$  
+
+In a single parameter case, we have $H= \frac{(\hat \beta^{IV}-\hat \beta^{OLS})^2}{\hat{var}(\hat \beta^{IV})-\hat{var}(\hat \beta^{OLS})}$ 
 
 
 ##Hausman results
 
 ```{r}
+
 
 # excluding lnw from OLS
 #homoscedastic case
@@ -96,7 +100,8 @@ var_b_ols=(summary(OLSS)$coef[2,2])^2
 var_delta_b=var_b_iv-var_b_ols
 H=((b_iv-b_ols)^2)/var_delta_b
 
-critical=pchisq(0.95,1)
+critical_x=pchisq(0.95,1)
+critical_F=pchisq(0.95,1,45)
 
 #h2 <- hausman.systemfit( fit2sls, fit3sls ) 
 
@@ -116,35 +121,70 @@ $$H= -44.393$$
 And the results testing the OLS with ln(w) against the IV:
 
 $$H= 0.076$$
-$$c = 0.670$$  
+$$c_x = 0.670,  c_F=4.92\times10^{-9}$$ 
 We reject the null hypothesis that price is exogenous in the first case and fail to reject in the second.  
 
-##Supply Elasticity for Area, Full Dataset
+##Supply Elasticity for Area
 
 ```{r}
 ###4 Repeat supply model with ln(area) as dependent variable
 ###ln_w is not included 
 dta <- dta %>% mutate(ln_area=log(area)) 
+
 olsarea=lm(ln_area~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta) %>% tidy
+IVSt <- ivreg(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta)%>%tidy
 IVarea <- ivreg(ln_area~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta) %>% tidy
+
+tIVS <- IVSt[-c(1, 3, 4, 5, 6), ]
+tolsarea <- olsarea[-c(1, 3, 4, 5, 6), ]
+tIVarea <- IVarea[-c(1, 3, 4, 5, 6, 7), ]
+
+tablefor4 <- rbind(tOLSS2, tolsarea, tIVS, tIVarea)
+rownames(tablefor4)= c("OLS of ln_qs with ln_w","OLS of ln_area with ln_w","IV of ln_qs with ln_w", "IV of ln_area with ln_w")
+
+kable(tablefor4)
+
 ```
 
-Put in comments on #4 here + maybe a few numbers!
+We can observe that the difference between the full quantity and just the area is similar in OLS and IV.
 
-**why do you say "l_w is not included?"
+
+## Adding 7 Years
 
 ```{r}
 ###5 adding the 7 extra years doesn't seem to change the IV estimates for the supply and demand model. 
 ###However, it did seem to affect our Hausmen test results. Whether Ho: price is exogenous or not.
+OLSSt_5=lm(ln_qs~ln_fp+trendsp1+trendsp2+trendsp3,dta2)%>% tidy
+tOLSS_5 <- OLSSt_5[-c(1, 3, 4, 5), ]
+OLSS2t_5=lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta2)%>% tidy
+tOLSS2_5 <- OLSS2t_5[-c(1, 3, 4, 5, 6), ]
+#a=lm(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3,dta)
+##demand
+OLSDt_5=lm(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3,dta2)%>% tidy
+tOLSD_5 <- OLSDt_5[-c(1, 3, 4, 5), ]
+## dropping the ln_w term gives us somewhat closer value
+
+IVSt_5 <- ivreg(ln_qs~ln_fp+ln_w+trendsp1+trendsp2+trendsp3|ln_w+trendsp1+trendsp2+trendsp3+lag_ln_w,data=dta2)%>% tidy
+tIVS_5<- IVSt_5[-c(1, 3, 4, 5, 6), ]
+
+IVDt_5 <- ivreg(ln_qd~ln_sp+trendsp1+trendsp2+trendsp3|trendsp1+trendsp2+trendsp3+ln_w,data=dta2)%>% tidy
+tIVD_5 <- IVDt_5[-c(1, 3, 4, 5, 6), ]
+
+
+OLSIVtable1 <- rbind(tOLSS_5, tOLSS2_5, tOLSD_5, tIVS_5, tIVD_5)
+rownames(OLSIVtable1)= c("OLS S", "OLS S with ln(w)", "OLS D", "IV S", "IV D")
+table5 <- rbind(OLSIVtable,OLSIVtable1)
+kable(table5)
 ```
 
-Add a few results for #5 here!
+Adding the 7 extra years doesn't seem to change the IV estimates for the supply and demand model. 
 
-Adding the 7 extra years doesn't seem to change the IV estimates for the supply and demand model. However, it did seem to affect our Hausmen test results for Whether Ho: price is exogenous or not.
+##Pubished Data
 
-## Comments on the online dataset
+It is inconvenient to post data in .dta format, since researchers who do not use stata are then unable to replicate their work.
 
-It is inconvenient to post data in .dta format.  
+
 They included their raw data, enabling other researchers to replicate their work.
 
 Will add more....
+
