@@ -17,7 +17,9 @@ library(AER)
 library(knitr)
 rm(list=ls())
 
-data.all = read.csv("C:/Users/tluo/Downloads/RSdata.csv")  # Location of downloaded dataset
+# data.all = read.csv("C:/Users/tluo/Downloads/RSdata.csv")  # Location of downloaded dataset
+data.all <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
+
 # Can we obtain the data using TA's method?
 RSdata.ext = data.all %>% mutate(lag_ln_w=lag(ln_w), ln_area=log(area)) %>% filter(year>=1962)
 RSdata = filter(RSdata.ext, year<=2007)

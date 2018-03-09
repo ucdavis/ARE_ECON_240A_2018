@@ -23,7 +23,8 @@ library(dplyr)
 library(xtable)
 library(kableExtra)
 
-RSdata <- read_csv("~/Documents/Classes/Winter 2017/ECN 240A Econometrics/Section/PS7/RSdata.csv")
+# RSdata <- read_csv("~/Documents/Classes/Winter 2017/ECN 240A Econometrics/Section/PS7/RSdata.csv")
+RSdata <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
 
 # OLS models
 supplyOLS <- lm(data = RSdata, ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3)
@@ -114,7 +115,8 @@ library(broom)
 library(dplyr)
 
 #RSdata <- read_csv("S:/Graduates/dmather/240a/redSlothPS7/RSdata.csv")
-RSdata <- read_csv("~/Documents/Classes/Winter 2017/ECN 240A Econometrics/Section/PS7/RSdata.csv")
+# RSdata <- read_csv("~/Documents/Classes/Winter 2017/ECN 240A Econometrics/Section/PS7/RSdata.csv")
+RSdata <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
 
 # OLS models
 

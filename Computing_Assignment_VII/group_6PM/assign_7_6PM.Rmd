@@ -2,7 +2,7 @@
 title: "Computing Assignment VII"
 author: "group"
 date: "March 9, 2018"
-output: pdf_document
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -22,7 +22,8 @@ library(AER)
 ```
 # load data
 ```{r data}
-data0 <- read.csv("C:/Users/Manho/Documents/UCDavis/Econ/18_Winter/240A/HW/hw7/RSdata.csv")
+# data0 <- read.csv("C:/Users/Manho/Documents/UCDavis/Econ/18_Winter/240A/HW/hw7/RSdata.csv")
+data0 <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
 data <- data.frame(sapply(data0, function(x) as.numeric(as.character(x))))
 data <- data %>% mutate(lag_ln_w = dplyr::lag(ln_w))
 ```
