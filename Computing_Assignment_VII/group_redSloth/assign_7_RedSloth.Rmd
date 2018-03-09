@@ -208,9 +208,9 @@ supplyIV.yield <- ivreg(data = RSdata, formula = ln_y ~ ln_fp + ln_w + trendsp1 
 stargazer(supplyIV.area, supplyIV.yield, header = FALSE, keep = c("ln_fp","ln_w"), title = "Using Area or Yield for Supply", font.size="small")
 ```
 #Q4 Comment
-One substantial difference is the estimate of supply elasticity from the OLS regression. Here our estimate is much higher than RS. This is because we include the weather (or yield) shock, while RS only use the uninstrumented price. \textbf{Removing $\boldsymbol{\omega_t}$, lowers $\boldsymbol{\beta_{s(OLS)}}$ to 0.038.}
+One substantial difference is the estimate of supply elasticity from the OLS regression. Here our estimate is much higher than RS. This is because we include the weather (or yield) shock, while RS only use the uninstrumented price. \textbf{Removing $\boldsymbol{\omega_t}$ lowers $\boldsymbol{\beta_{s(OLS)}}$ to 0.038.}
 
 
 #Question 5 and 6
 1. The additional seven years of data have only a moderate impact on our results--this could be responsible for some of the differences we see from the published results.
-2. The data as posted is in proprietary Stata format, and unnecessarily spread across multiple files.  This is not best practices, and makes it more difficult to understand the data structure and contents.
+2. The data as posted is in proprietary Stata format, and unnecessarily spread across multiple files.  This is not best practice, and makes it more difficult to understand the data structure and contents.
