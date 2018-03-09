@@ -8,13 +8,12 @@ output: pdf_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(AER)
+
 # Problem 1
 RSdata_raw <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")%>% mutate(.,ln_area=log(area))
 RSdata <- na.omit(RSdata_raw)
 
 reg_qs<- lm(ln_qs ~ ln_fp+trendsp1+trendsp2+trendsp3, data=RSdata,na.rm=TRUE)
-
-
 reg_qd<- lm(ln_qd ~ ln_sp +trendsp1+ trendsp2+trendsp3, data=RSdata)
 summary(reg_qs)
 summary(reg_qd)
