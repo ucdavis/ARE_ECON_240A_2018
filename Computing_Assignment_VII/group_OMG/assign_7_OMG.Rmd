@@ -121,7 +121,7 @@ $$H= -44.393$$
 And the results testing the OLS with ln(w) against the IV:
 
 $$H= 0.076$$
-$$c_x = 0.670,  c_F=4.92\times10^{-9}$$ 
+
 We reject the null hypothesis that price is exogenous in the first case and fail to reject in the second.  
 
 ##Supply Elasticity for Area
