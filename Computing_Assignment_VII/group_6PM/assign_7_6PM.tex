@@ -1,0 +1,412 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\hypersetup{unicode=true,
+            pdftitle={Computing Assignment VII},
+            pdfauthor={group},
+            pdfborder={0 0 0},
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{{#1}}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{{#1}}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{{#1}}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{{#1}}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{{#1}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{{#1}}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{{#1}}}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{{#1}}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{{#1}}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{{#1}}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{{#1}}}
+\newcommand{\ImportTok}[1]{{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{{#1}}}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{{#1}}}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{{#1}}}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{{#1}}}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{{#1}}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{{#1}}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{{#1}}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{{#1}}}}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{{#1}}}}
+\newcommand{\BuiltInTok}[1]{{#1}}
+\newcommand{\ExtensionTok}[1]{{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{{#1}}}
+\newcommand{\RegionMarkerTok}[1]{{#1}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{{#1}}}}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{{#1}}}}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{{#1}}}}
+\newcommand{\NormalTok}[1]{{#1}}
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\IfFileExists{parskip.sty}{%
+\usepackage{parskip}
+}{% else
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{0}
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+\let\oldparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+\let\oldsubparagraph\subparagraph
+\renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+%%% Use protect on footnotes to avoid problems with footnotes in titles
+\let\rmarkdownfootnote\footnote%
+\def\footnote{\protect\rmarkdownfootnote}
+
+%%% Change title format to be more compact
+\usepackage{titling}
+
+% Create subtitle command for use in maketitle
+\newcommand{\subtitle}[1]{
+  \posttitle{
+    \begin{center}\large#1\end{center}
+    }
+}
+
+\setlength{\droptitle}{-2em}
+  \title{Computing Assignment VII}
+  \pretitle{\vspace{\droptitle}\centering\huge}
+  \posttitle{\par}
+  \author{group}
+  \preauthor{\centering\large\emph}
+  \postauthor{\par}
+  \predate{\centering\large\emph}
+  \postdate{\par}
+  \date{March 9, 2018}
+
+
+\begin{document}
+\maketitle
+
+\subsection{your document}\label{your-document}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{rm}\NormalTok{(}\DataTypeTok{list =} \KeywordTok{ls}\NormalTok{())           }\CommentTok{# clean the workspace}
+\KeywordTok{library}\NormalTok{(ggplot2)          }\CommentTok{# use read_dta}
+\KeywordTok{library}\NormalTok{(tidyverse)        }\CommentTok{# data cleaning packages}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## -- Attaching packages ---------------------------------- tidyverse 1.2.1 --
+\end{verbatim}
+
+\begin{verbatim}
+## √ tibble  1.4.2     √ purrr   0.2.4
+## √ tidyr   0.8.0     √ dplyr   0.7.4
+## √ readr   1.1.1     √ stringr 1.3.0
+## √ tibble  1.4.2     √ forcats 0.3.0
+\end{verbatim}
+
+\begin{verbatim}
+## -- Conflicts ------------------------------------- tidyverse_conflicts() --
+## x dplyr::filter() masks stats::filter()
+## x dplyr::lag()    masks stats::lag()
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(broom)}
+\KeywordTok{library}\NormalTok{(lmtest)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Loading required package: zoo
+\end{verbatim}
+
+\begin{verbatim}
+## 
+## Attaching package: 'zoo'
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:base':
+## 
+##     as.Date, as.Date.numeric
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(MASS)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Attaching package: 'MASS'
+\end{verbatim}
+
+\begin{verbatim}
+## The following object is masked from 'package:dplyr':
+## 
+##     select
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(dplyr)}
+\KeywordTok{library}\NormalTok{(AER)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Loading required package: car
+\end{verbatim}
+
+\begin{verbatim}
+## 
+## Attaching package: 'car'
+\end{verbatim}
+
+\begin{verbatim}
+## The following object is masked from 'package:dplyr':
+## 
+##     recode
+\end{verbatim}
+
+\begin{verbatim}
+## The following object is masked from 'package:purrr':
+## 
+##     some
+\end{verbatim}
+
+\begin{verbatim}
+## Loading required package: sandwich
+\end{verbatim}
+
+\begin{verbatim}
+## Loading required package: survival
+\end{verbatim}
+
+\section{load data}\label{load-data}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# data0 <- read.csv("C:/Users/Manho/Documents/UCDavis/Econ/18_Winter/240A/HW/hw7/RSdata.csv")}
+\NormalTok{data0 <-}\StringTok{ }\KeywordTok{read_csv}\NormalTok{(}\StringTok{"https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Parsed with column specification:
+## cols(
+##   year = col_integer(),
+##   area = col_double(),
+##   prod = col_double(),
+##   cons = col_double(),
+##   yield_shock = col_double(),
+##   cpi = col_double(),
+##   fut_price = col_double(),
+##   spot_price = col_double(),
+##   ln_qs = col_double(),
+##   ln_fp = col_double(),
+##   ln_qd = col_double(),
+##   ln_sp = col_double(),
+##   ln_w = col_double(),
+##   trendsp1 = col_integer(),
+##   trendsp2 = col_double(),
+##   trendsp3 = col_double(),
+##   lag_ln_w = col_double()
+## )
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{data <-}\StringTok{ }\KeywordTok{data.frame}\NormalTok{(}\KeywordTok{sapply}\NormalTok{(data0, function(x) }\KeywordTok{as.numeric}\NormalTok{(}\KeywordTok{as.character}\NormalTok{(x))))}
+\NormalTok{data <-}\StringTok{ }\NormalTok{data %>%}\StringTok{ }\KeywordTok{mutate}\NormalTok{(}\DataTypeTok{lag_ln_w =} \NormalTok{dplyr::}\KeywordTok{lag}\NormalTok{(ln_w))}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{run OLS}\label{run-ols}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# OLS supply w/o ln_w}
+\NormalTok{reg_s <-}\StringTok{ }\KeywordTok{lm}\NormalTok{(ln_qs ~}\StringTok{ }\NormalTok{ln_fp +}\StringTok{ }\NormalTok{trendsp1+trendsp2+trendsp3, }\DataTypeTok{data=}\NormalTok{data)}
+\NormalTok{b_ols<-}\KeywordTok{coeftest}\NormalTok{(reg_s)[,}\DecValTok{1}\NormalTok{]%>%}
+\StringTok{  }\KeywordTok{as.matrix}\NormalTok{() }
+
+\CommentTok{# OLS supply w/ ln_w}
+\NormalTok{reg_s_w <-}\StringTok{ }\KeywordTok{lm}\NormalTok{(ln_qs ~}\StringTok{ }\NormalTok{ln_fp +}\StringTok{ }\NormalTok{ln_w +}\StringTok{ }\NormalTok{trendsp1+trendsp2+trendsp3, }\DataTypeTok{data=}\NormalTok{data)}
+\NormalTok{b_ols_w<-}\KeywordTok{coeftest}\NormalTok{(reg_s_w)[,}\DecValTok{1}\NormalTok{] %>%}
+\StringTok{  }\KeywordTok{as.matrix}\NormalTok{()}
+
+\CommentTok{# OLS demand}
+\NormalTok{reg_d <-}\StringTok{ }\KeywordTok{lm}\NormalTok{(ln_qd ~}\StringTok{ }\NormalTok{ln_sp +}\StringTok{ }\NormalTok{trendsp1+trendsp2+trendsp3, }\DataTypeTok{data=}\NormalTok{data)}
+\NormalTok{b_ols_d<-}\KeywordTok{coeftest}\NormalTok{(reg_d)[,}\DecValTok{1}\NormalTok{] %>%}
+\StringTok{  }\KeywordTok{as.matrix}\NormalTok{()}
+
+\NormalTok{## run IV reg}
+
+\CommentTok{# IV w/o ln_w}
+\NormalTok{reg_s_iv <-}\KeywordTok{ivreg}\NormalTok{(ln_qs ~}\StringTok{ }\NormalTok{ln_fp +}\StringTok{ }\NormalTok{trendsp1+trendsp2+trendsp3, ~lag_ln_w +}\StringTok{ }\NormalTok{trendsp1+trendsp2+trendsp3, data)}
+\KeywordTok{coeftest}\NormalTok{(reg_s_iv)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## t test of coefficients:
+## 
+##                Estimate  Std. Error  t value Pr(>|t|)    
+## (Intercept) -69.4899096   3.9925273 -17.4050  < 2e-16 ***
+## ln_fp         0.0598294   0.0520093   1.1504  0.25569    
+## trendsp1      0.0392843   0.0020617  19.0547  < 2e-16 ***
+## trendsp2     -0.0301243   0.0112554  -2.6764  0.01015 *  
+## trendsp3      0.0610156   0.0321570   1.8974  0.06380 .  
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{b_iv<-}\KeywordTok{coeftest}\NormalTok{(reg_s_iv)[,}\DecValTok{1}\NormalTok{] %>%}
+\StringTok{  }\KeywordTok{as.matrix}\NormalTok{()}
+
+\CommentTok{# IV w ln_w}
+\NormalTok{reg_s_iv_w <-}\KeywordTok{ivreg}\NormalTok{(ln_qs ~}\StringTok{ }\NormalTok{ln_fp +}\StringTok{ }\NormalTok{ln_w +}\StringTok{ }\NormalTok{trendsp1+trendsp2+trendsp3, ~lag_ln_w +}\StringTok{ }\NormalTok{ln_w+trendsp1+trendsp2+trendsp3, data)}
+\KeywordTok{coeftest}\NormalTok{(reg_s_iv_w)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## t test of coefficients:
+## 
+##                Estimate  Std. Error  t value  Pr(>|t|)    
+## (Intercept) -62.3715258   2.0567150 -30.3258 < 2.2e-16 ***
+## ln_fp         0.1016518   0.0251466   4.0424 0.0001949 ***
+## ln_w          1.2909624   0.1059657  12.1828 3.776e-16 ***
+## trendsp1      0.0356272   0.0010627  33.5243 < 2.2e-16 ***
+## trendsp2     -0.0129334   0.0058001  -2.2299 0.0305720 *  
+## trendsp3      0.0131400   0.0165279   0.7950 0.4305995    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{b_iv_w<-}\KeywordTok{coeftest}\NormalTok{(reg_s_iv_w)[,}\DecValTok{1}\NormalTok{] %>%}
+\StringTok{  }\KeywordTok{as.matrix}\NormalTok{()}
+
+\NormalTok{reg_d_iv <-}\KeywordTok{ivreg}\NormalTok{(ln_qd ~}\StringTok{ }\NormalTok{ln_sp +}\StringTok{ }\NormalTok{trendsp1+trendsp2+trendsp3, ~ln_w+trendsp1+trendsp2+trendsp3, data)}
+\KeywordTok{coeftest}\NormalTok{(reg_d_iv)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## t test of coefficients:
+## 
+##                Estimate  Std. Error  t value  Pr(>|t|)    
+## (Intercept) -71.7698078   1.7847861 -40.2120 < 2.2e-16 ***
+## ln_sp        -0.0632913   0.0228220  -2.7733   0.00788 ** 
+## trendsp1      0.0405538   0.0009175  44.2003 < 2.2e-16 ***
+## trendsp2     -0.0468272   0.0050383  -9.2943 2.629e-12 ***
+## trendsp3      0.1108452   0.0148306   7.4741 1.385e-09 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+\end{verbatim}
+
+\section{Hausman test}\label{hausman-test}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{H <-}\StringTok{ }\KeywordTok{t}\NormalTok{(b_iv-b_ols)%*%}\KeywordTok{solve}\NormalTok{(}\KeywordTok{vcov}\NormalTok{(reg_s_iv)-}\KeywordTok{vcov}\NormalTok{(reg_s))%*%(b_iv-b_ols)}
+\NormalTok{H_w <-}\StringTok{ }\KeywordTok{t}\NormalTok{(b_iv_w-b_ols_w)%*%}\KeywordTok{solve}\NormalTok{(}\KeywordTok{vcov}\NormalTok{(reg_s_iv_w)-}\KeywordTok{vcov}\NormalTok{(reg_s_w))%*%(b_iv_w-b_ols_w)}
+
+\KeywordTok{pchisq}\NormalTok{(H,}\DataTypeTok{df=}\DecValTok{5}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##             [,1]
+## [1,] 0.002153352
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{pchisq}\NormalTok{(H_w,}\DataTypeTok{df=}\DecValTok{5}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##          [,1]
+## [1,] 0.179355
+\end{verbatim}
+
+\section{supply elasticity for area,
+yield}\label{supply-elasticity-for-area-yield}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{reg_s_ay <-}\StringTok{ }\KeywordTok{lm}\NormalTok{(ln_qs ~}\StringTok{ }\KeywordTok{log}\NormalTok{(area) +}\StringTok{ }\KeywordTok{log}\NormalTok{(yield_shock), }\DataTypeTok{data=}\NormalTok{data)}
+\KeywordTok{coeftest}\NormalTok{(reg_s_ay)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## t test of coefficients:
+## 
+##                    Estimate Std. Error  t value Pr(>|t|)    
+## (Intercept)      -15.398910   0.687408 -22.4014   <2e-16 ***
+## log(area)          3.774865   0.108788  34.6994   <2e-16 ***
+## log(yield_shock)   0.082331   0.488641   0.1685   0.8669    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+\end{verbatim}
+
+
+\end{document}
