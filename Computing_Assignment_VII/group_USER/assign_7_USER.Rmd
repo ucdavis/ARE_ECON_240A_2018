@@ -9,73 +9,96 @@ output: slidy_presentation
 knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
 ```
 
-## Replication of Robert and Schlenker
+## Replication of RS' main results
 ```{r IV and OLS}
 library(tidyverse)
-#install.packages("AER")
+# install.packages("AER")
 library(AER)
 library(knitr)
 rm(list=ls())
 
-data.all = read.csv("C:/Users/tluo/Downloads/RSdata.csv")  # Location of downloaded dataset
+# data.all = read.csv("C:/Users/tluo/Downloads/RSdata.csv")  # Location of downloaded dataset
+data.all <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
+
+# Can we obtain the data using TA's method?
 RSdata.ext = data.all %>% mutate(lag_ln_w=lag(ln_w), ln_area=log(area)) %>% filter(year>=1962)
 RSdata = filter(RSdata.ext, year<=2007)
 
 # OLS #
-OLS1 = lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+OLS11 = lm(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata) #include ln_w
+OLS12 = lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data=RSdata) #exlude ln_w
 OLS2 = lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3, data=RSdata)
 # IV #
-iv1 = ivreg(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 |
-                 lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+iv1 = ivreg(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 |
+                    ln_w + lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+                    # include ln_w in both equations
 iv2 = ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 |
-                     ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+                    ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
 
 # OLS results #
-kable(rbind(ln_fp = summary(OLS1)$coef["ln_fp",1:2], ln_sp = summary(OLS2)$coef["ln_sp",1:2]), digits = 3, caption="Table 1a. OLS Estimates")
+kable(rbind(ln_fp.include = summary(OLS11)$coef["ln_fp",-3], ln_fp.exclude =    summary(OLS12)$coef["ln_fp",-3], ln_sp = summary(OLS2)$coef["ln_sp",-3]), digits = 3, caption = "Table 1a. OLS Estimates")  
 # IV results #
-kable(rbind(ln_fp = summary(iv1)$coef["ln_fp",1:2], ln_sp = summary(iv2)$coef["ln_sp",1:2]), digits = 3, caption="Table 1b. IV Estimates")
+kable(rbind(ln_fp = summary(iv1)$coef["ln_fp",-3], ln_sp = summary(iv2)$coef["ln_sp",-3]), digits = 3, caption="Table 1b. IV Estimates")
 
 ```
+  
+(1) RS excluded ln_w in their OLS model for the supply side.  
+(2) The estimates do not match exactly to the results of the paper since our data of ln_w is a little bit different from RS's but still compatible with RS's results in terms of signs, magnititudes and significances.  
 
-The estimates do not match exact to the results of the paper, but in the same ball park, and general results are consistent.
+## Hausman Test
+Suppose that  
+$$y_i = x_i'\beta + e_i, \quad E[x_i e_i]=0 (H_0); \quad x_i = \Gamma' z_i + v_i, \quad E[z_i v_i] = E[z_i e_i] = 0$$
+Then
+$$E[x_i e_i] = E[(\Gamma' z_i + v_i) e_i] = \Gamma'E[z_i e_i] + E[v_i e_i] =0$$
+If $E[x_i e_i] \neq 0$, then $E[v_i e_i] \neq 0$. Thus, a linear regression model with OLS can be used to test whether the projection coefficient of $e_i$ over $v_i$ is zero or not as a method to test $E[x_i e_i]=0$. 
 
-## Hausman Test p-value
 ```{r Hausman}
-## Hausman Test ##
-kable(data.frame(supply = summary(iv1, diagnostics = T)$diagnostics["Wu-Hausman","p-value"],
-           demand = summary(iv2, diagnostics = T)$diagnostics["Wu-Hausman","p-value"]),
-      digits=3, caption = "Table 2. Using diagnostics")
+## Hausman Test - Existing test##
+hausman = summary(iv1, diagnostics = T)$diagnostics["Wu-Hausman","p-value"]
 
 ## Hausman Test- Manual ##
-# Supply
-resid1 = lm(ln_fp ~ lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)$res
-resid2 = lm(ln_sp ~ ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)$res
+#step 1: obtain the residuals of the first stage of IV regression
+resid = lm(ln_fp ~ ln_w + lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)$res
 
-kable(data.frame(supply = summary(lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 + resid1, data=cbind(RSdata,resid1)))$coef["resid1","Pr(>|t|)"],
-                 demand = summary(lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 + resid2, data=cbind(RSdata,resid1)))$coef["resid2","Pr(>|t|)"]),
-      digits=3, caption= "Manual Computation")
-
+# step 2: 
+ols1 = lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 + resid, 
+          data=cbind(RSdata,resid)) # exclude ln_w
+ols2 = lm(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 + resid,    
+          data=cbind(RSdata,resid)) # include ln_w
+##manual vs. existing
+kable(data.frame(ols.exlude = summary(ols1)$coef["resid","Pr(>|t|)"], ols.include = 
+      summary(ols2)$coef["resid","Pr(>|t|)"], hausman), digits=3, caption= "Husman Test")
 ```
 
-Difference between OLS and IV not significant for demand equation but signficiant for supply equation
+(1) If ln_w included, there is no significant difference between OLS and IV.  
+(2) If ln_w excluded, there is significant difference between OLS and IV.  
 
-## Supply elasticity for Area
+## Supplemental results
+
+1. Supply elasticity for area    
+
 ```{r Area}
-iv3 = ivreg(ln_area ~ ln_fp + trendsp1 + trendsp2 + trendsp3 |
-              lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
-kable(data.frame(elasticity=summary(iv3)$coef["ln_fp",1:2]), digits=3, caption = "Table 3. Supply elasticity for Area")
+iv3 = ivreg(ln_area ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 |
+            ln_w + lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata)
+
+kable(t(data.frame(ln_fp=summary(iv3)$coef["ln_fp",-3])), digits=3, caption = "Table 3. Supply elasticity for Area")
 ```
 
-Supply elasticity for area slightly higher than that for total quantity, but are comparable.
+The supply elasticity for area is lower than that for total quantity but not that much. In fact, they are comparable in terms of sign, magnititude and significance.  
 
-## Additional years of data
+2. Impact of additional years of data  
+
 ```{r ext}
-iv1b = ivreg(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 | lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata.ext)
-iv2b = ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w     + trendsp1 + trendsp2 + trendsp3, data=RSdata.ext)
-kable(rbind(ln_fp = summary(iv1b)$coef["ln_fp",1:2], ln_sp = summary(iv2b)$coef["ln_sp",1:2]), digitis = 3, caption = "Table 4. Additional 7 years of recent data")
+iv1b = ivreg(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | ln_w +     
+             lag_ln_w + trendsp1 + trendsp2 + trendsp3, data=RSdata.ext)
+iv2b = ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w + 
+             trendsp1 + trendsp2 + trendsp3, data=RSdata.ext)
+
+kable(rbind(ln_fp = summary(iv1b)$coef["ln_fp",-3], ln_sp = summary(iv2b)$coef["ln_sp",-3]), digits = 3, caption = "Table 4. Additional 7 years of recent data")
+
 ```
 
-Estimates are different but arguably not very different and does not change the main results
+Estimates have the same signs as before with only slight differences in terms of magnitudes and significances.  
 
 ## Comments on original datasets
 The orginal datasets and code are provided by the authors in a modular fashion. The authors could have organized the data in a single dataset and provided the code in only one file with indicated sections, which would have made replicating the results a bit easier. But on the other hand, compared to many other authors who provide data and code with little explaination, theirs is relatively complete. 

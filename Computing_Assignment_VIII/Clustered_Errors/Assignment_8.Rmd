@@ -1,0 +1,104 @@
+---
+title: "Assignment_8"
+author: "Clustered Errors"
+date: "3/14/2018"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(MASS)
+library(broom)
+library(modelr)
+library(tidyverse)
+select <- dplyr::select
+```
+
+```{r sim}
+Sigma <-matrix(c(1, 0.7, 0.7, 1), 2)
+X <-mvrnorm(n=n,c(0, 0), Sigma = Sigma)
+y <- 1.2 + 0.3*X[,1]+1.1*X[,2] + rnorm(n)
+
+
+sim_reg <- function(n=100, B=200) {
+  Sigma <-matrix(c(1, 0.7, 0.7, 1), 2)
+  X <-mvrnorm(n=n, c(0, 0), Sigma = Sigma)
+  y <- 1.2 + 0.3*X[,1]+1.1*X[,2] + rnorm(n)
+  df <-data_frame(y=y, X1=X[,1], X2=X[,2])
+  
+  ## reg
+  reg <-lm(y~X1+X2, data=df)
+  reg_su <-summary(reg)
+  reg_co <-tidy(reg_su)
+  co_X0 <- reg_co$estimate[1]
+  co_X1 <- reg_co$estimate[2]
+  co_X2 <- reg_co$estimate[3]
+  
+  beta_hat <- c(co_X0, co_X1, co_X2)
+  beta_naught <- c(1.2, 0.3, 1.1) 
+  
+  ratio <- co_X1/co_X2
+  
+  ## Delta
+  # R <- COMPUTE IT for the three parameters
+  R <- c(0, 1.1, -0.3)
+  v <-as.numeric(t(R) %*% 
+        vcov(reg_su) %*%
+          R)
+  # W-test
+  W_test <- (t(R) %*% beta_hat - t(R) %*% beta_naught) %*% 
+    (t(R) %*% v %*% R)^{-1} %*% 
+      (t(R) %*% beta_hat - t(R) %*% beta_naught)
+  
+  ## boot it:
+  x_boot <- modelr::bootstrap(df, n=B) %>% 
+    mutate(reg=map(strap, ~lm(y~X1+X2, data=.)),
+           reg_su =map(reg, summary),
+           reg_co =map(reg_su, tidy),
+           ratio_b =map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+           R =map(reg_co, COMPUTE ))),
+          vcov_b =map2_dbl(reg_su, R, COMPUTE)),
+          W_test_b =map2_dbl(ratio_b, vcov_b, COMPUTE centering around H0 ratio),
+          W_test_b2 =map2_dbl(ratio_b, vcov_b, COMPUTE centering around estimated ratio ))
+  x_boot2 <- x_boot %>% 
+    summarise(boot_sd=sd(ratio_b),
+              boot_sd_v =mean(vcov_b),
+              boot_mean=mean(ratio_b),
+              wtest_cval=COMPUTE,
+              wtest2_cval=COMPUTE)
+  x_boot2
+  
+  ## results: original Wald and va, and boot aggregates
+  data_frame(co_X1=co_X1, co_X2=co_X2, ratio=ratio,W_test=W_test,v=v) %>% 
+    bind_cols(x_boot2)
+  }
+
+
+
+```
+
+# Cross Validation
+
+```{r cross_validation}
+# Generate Data
+n <- 100
+S <- matrix(c(1, 0.5, 0.5, 1), 2)
+set.seed(2018)
+X <- mvrnorm(n = n, mu = c(0, 0), Sigma = S)
+y <- 1.2 + 0.3 * X[, 1] + rnorm(n)
+
+data_df <- data_frame(y = y, x1 = X[, 1], x2 = X[, 2])
+
+# Perform Cross Validation
+cv_df <- crossv_kfold(data_df, k = n)
+
+crossval <- cv_df %>%
+  mutate(reg1 = map(train, ~ lm(y ~ x1, data = .)),
+         reg2 = map(train, ~ lm(y ~ x1 + x2, data = .))) %>%
+  gather(model, reg, reg1, reg2) %>%
+  mutate(resids_out = map2_dbl(reg, test, ~ predict(.x, newdata = .y) - as_data_frame(.y)$y),
+         mse_in = map_dbl(reg, ~ mean(residuals(.)^2)),
+         mse_out = map_dbl(resids_out, ~ mean(.^2))) %>%
+  gather(mse, value, mse_in, mse_out)
+```
+
