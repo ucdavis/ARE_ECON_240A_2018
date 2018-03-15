@@ -13,13 +13,6 @@ library(modelr)
 library(tidyverse)
 ```
 
-## R Markdown
-
-This is an R Markdown presentation. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
-
-
 ```{r sim}
 Sigma <-matrix(c(1, 0.7, 0.7, 1), 2)
 X <-mvrnorm(n=n,c(0, 0), Sigma = Sigma)
@@ -83,10 +76,9 @@ sim_reg <- function(n=100, B=200) {
 
 ```
 
+# Cross Validation
 
-## Slide with Plot
+```{r cross_validation}
 
-```{r pressure}
-plot(pressure)
 ```
 
