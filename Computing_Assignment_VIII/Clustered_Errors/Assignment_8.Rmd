@@ -11,6 +11,7 @@ library(MASS)
 library(broom)
 library(modelr)
 library(tidyverse)
+select <- dplyr::select
 ```
 
 ```{r sim}
@@ -79,6 +80,25 @@ sim_reg <- function(n=100, B=200) {
 # Cross Validation
 
 ```{r cross_validation}
+# Generate Data
+n <- 100
+S <- matrix(c(1, 0.5, 0.5, 1), 2)
+set.seed(2018)
+X <- mvrnorm(n = n, mu = c(0, 0), Sigma = S)
+y <- 1.2 + 0.3 * X[, 1] + rnorm(n)
 
+data_df <- data_frame(y = y, x1 = X[, 1], x2 = X[, 2])
+
+# Perform Cross Validation
+cv_df <- crossv_kfold(data_df, k = n)
+
+crossval <- cv_df %>%
+  mutate(reg1 = map(train, ~ lm(y ~ x1, data = .)),
+         reg2 = map(train, ~ lm(y ~ x1 + x2, data = .))) %>%
+  gather(model, reg, reg1, reg2) %>%
+  mutate(resids_out = map2_dbl(reg, test, ~ predict(.x, newdata = .y) - as_data_frame(.y)$y),
+         mse_in = map_dbl(reg, ~ mean(residuals(.)^2)),
+         mse_out = map_dbl(resids_out, ~ mean(.^2))) %>%
+  gather(mse, value, mse_in, mse_out)
 ```
 
