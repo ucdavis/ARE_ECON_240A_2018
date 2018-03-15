@@ -1,0 +1,147 @@
+---
+title: "Assignment8"
+author: "OZONE"
+date: "March 14, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+# install.packages("MASS")
+# install.packages("broom")
+# install.packages("modelr")
+# install.packages("tidyverse")
+
+knitr::opts_chunk$set(echo = F)
+library(MASS)
+library(broom)
+library(modelr)
+library(tidyverse)
+```
+
+
+
+```{r}
+sim_reg <- function(n=100, B=200){
+## DGP
+Sigma <- matrix(c(1, 0.7, 0.7, 1), 2) 
+X <- mvrnorm(n=n, c(0, 0), Sigma = Sigma)
+y <- 1.2 + 0.3*X[,1]+1.1*X[,2]+rnorm(n)
+df <- data_frame(y=y, X1=X[,1], X2=X[,2])
+
+## reg 
+reg <- lm(y~X1+X2, data=df) 
+reg_su <- summary(reg) 
+reg_co <- tidy(reg_su) 
+co_X1 <- reg_co$estimate[2] 
+co_X2 <- reg_co$estimate[3]
+ratio <- co_X1/co_X2
+
+## Delta (Wald_test)
+R <- c(0,1/co_X2,-co_X1/co_X2^2)
+v <- as.numeric(t(R) %*% vcov(reg_su) %*% R)
+W_test <- as.numeric( t(ratio-0.3/1.1) %*% solve(v) %*% (ratio-0.3/1.1) )
+ 
+# ## boot it:
+x_boot <- modelr::bootstrap(df, n=B)%>%
+mutate(reg=map(strap, ~lm(y~X1+X2, data=.)),
+      reg_su = map(reg, summary), 
+      reg_co = map(reg_su, tidy),
+      ratio_b = map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+      R = map(reg_co, ~c(0,1/.$estimate[3],-.$estimate[2]/.$estimate[3]^2)),
+      vcov_b = map2_dbl(reg_su, R,  ~as.numeric(t(.y) %*% vcov(.x) %*% (.y))),
+      W_test_b = map2_dbl(ratio_b, vcov_b, 
+                              ~ as.numeric( t(.x-0.3/1.1) %*% solve(.y) %*% (.x-0.3/1.1))),
+      W_test_b2 = map2_dbl(ratio_b, vcov_b, 
+                               ~as.numeric( t(.x-ratio) %*% solve(.y) %*% (.x-ratio)))
+      )
+
+x_boot2 <- x_boot %>%
+  summarise(boot_sd=sd(ratio_b),
+            boot_sd_v = mean(vcov_b),
+            boot_mean=mean(ratio_b),
+            wtest_cval=sort(W_test_b)[B * 0.95],  #95% quantile of wtest
+            wtest2_cval=sort(W_test_b2)[B * 0.95]) #95% quantile of wtest2
+
+## results: original Wald and va, and boot aggregates
+data_frame(co_X1=co_X1, co_X2=co_X2, ratio=ratio, W_test=W_test, v=v) %>%
+bind_cols(x_boot2)
+
+}
+
+# S=200 times
+test = replicate(200,sim_reg(), simplify = F) %>% bind_rows()
+exact = var(test$ratio)
+estimated = mean(test$boot_sd^2)
+
+test = test %>% mutate(wtest_bootvar = (ratio - 0.3/1.1)^2 * boot_sd^(-2))
+  
+```
+## Testing for the ratio of coefficients
+###Question 
+1. The exact variance of the ratio is `r exact`, and the asymptotic and bootstrap one is `r estimated`. The asymptotic and bootstrap one is bigger, so the Wald statistics is relatively smaller. I expect the rejection to be bewlow 5%. 
+2. The 95% quantile of the Wald test is`r quantile(test$W_test,0.95)`, which is lower than the asymptotic 95% quantile:`r qchisq(0.95,1)`.
+3. The average rejection rate is `r sum(test$W_test > qchisq(0.95,1))/200`.
+4. The average rejection rate is `r sum(test$wtest_bootvar > qchisq(0.95,1))/200`. Underreject the null hypothesis.
+5. The average rejection rate when comparing original Wald test with 95% quantile of the bootstrapped Wald centered around $\frac{\beta_1}{\beta_2}$ is `r sum(test$W_test > test$wtest_cval)/200`.
+The average rejection rate when comparing original Wald test with 95% quantile of the bootstrapped Wald centered around $\frac{\hat{\beta_1}}{\hat{\beta_2}}$ is `r sum(test$W_test > test$wtest2_cval)/200`.
+6. From 3, the rejection rate of Wald test is `r sum(test$W_test > qchisq(0.95,1))/200`, which indicates asymptotically, the Wald test statistic converges in distribution to Chi-square distribution with degree of freedom of 1. From 4, rejection rate of `r sum(test$wtest_bootvar > qchisq(0.95,1))/200` indicates that we underreject the null hypothesis, which is what we expected in Question 1. For question 5, the first rejection rate is false since we centered around the true value of $\beta_1/\beta_2$; the second rejection rate is `r sum(test$W_test > test$wtest2_cval)/200`, which is close to 5%.
+7. Under H0: $\frac{\hat{\beta_1}}{\hat{\beta_2}}$, $\hat{\theta}-\theta = \frac{\hat{\beta_1}}{\hat{\beta_2}} - \frac{0.3}{1.1}$ and $R' = (0\ \frac{1}{\hat{\beta_2}}\ -\frac{\hat{\beta_1}}{\hat{\beta_2}^2})$. Under the H0: $\hat{\beta_1}=\frac{0.3}{1.1}\hat{\beta_2}$, $\hat{\theta}-\theta =\hat{\beta_1} - \frac{0.3}{1.1}\hat{\beta_2} -0$ and $R' = (0\ 1\ -\frac{0.3}{1.1})$. Denote the Wald test statistic under first hypothesis as $W_1$ and the corresponding Wald test for second hypothesis as $W_2$. After calculation and rearrangement: $$\frac{W_1}{W_2} = \frac{1+(\frac{0.3}{1.1})^2}{1+(\frac{\hat{\beta_1}}{\hat{\beta_2}})^2}$$. If $\frac{\hat{\beta_1}}{\hat{\beta_2}}>\frac{0.3}{1.1}$, then $W_1 < W_2$. If $\frac{\hat{\beta_1}}{\hat{\beta_2}}<\frac{0.3}{1.1}$, then $W_1 > W_2$
+
+## Cross-validation
+
+```{r, results='asis', warning=F}
+library(MASS)
+select <- dplyr::select 
+library(modelr)
+library(knitr)
+## generate data 
+n <- 100 
+S <- matrix(c(1, 0.5, 0.5, 1), 2)
+set.seed(2018)
+X <- mvrnorm(n = n, mu=c(0,0), Sigma=S) 
+y <- 1.2 + 0.3 * X[,1]+rnorm(n)
+data_df <- data_frame(y=y, x1=X[,1], x2=X[,2])
+
+## cross validation 
+
+crossval_df <- crossv_kfold(data_df, k = n) %>% as.tbl
+# crossval_df
+# crossval_df$train[1]
+# crossval_df$test[1]
+
+
+crossval <- crossval_df %>%
+  mutate(reg1 = map(train, ~lm(y~x1, data=.)), 
+         reg2 = map(train, ~lm(y~x1+x2, data=.))) %>%
+  gather(model, reg, reg1, reg2) %>% 
+  mutate(resids_out = map2_dbl(reg, test, ~ predict(.x, newdata=.y)-as_data_frame(.y)$y), 
+         mse_in = map_dbl(reg, ~mean(residuals(.)^2)), 
+         mse_out = map_dbl(resids_out, ~.^2)) %>%
+ gather(mse, value, mse_in, mse_out)
+
+temp = as.data.frame(crossval %>% group_by(model,mse) %>% 
+  summarise(MSE = mean(value)))
+kable(temp)
+#Question 3; Hansen3.47
+reg1 = lm(y~x1,data_df)
+reg2 = lm(y~x1+x2,data_df)
+data_df = mutate(data_df,h_1=hatvalues(reg1),e_1=residuals(reg1),h_2=hatvalues(reg2),e_2=residuals(reg2))
+MSE_1=mean((1-data_df$h_1)^(-2)*data_df$e_1^2)
+MSE_2=mean((1-data_df$h_2)^(-2)*data_df$e_2^2)
+```
+
+###Question
+1. 
+- crossval_df is a $100\times3$ tidy dataframe. For cell, the object is in list type for train and test columns and character for id column. The dimension for the cells in train is $99 \times3$ and for the cells in test is $1 \times 3$, for the celss in .id is $1 \times 1$.
+- mse contains mse_in and mse_out, which indicates in-sample and out-of-sample MSE. model contains reg1 and reg2, which indicates wether we include $x_2$ in the regression. value contains the value of MSE.
+-.x refers to the reg column, .y refers to the test column.
+
+2. 
+- For in-sample MSE, adding one more variable will decrease the MSE. Intuitively, adding one more variable will better fit the data, which will decrease the MSE.
+- For out-sample MSE, we still observes that the MSE decreases when adding one more variable. However, this is because the randomness of the data generating process. If we delete seed(2018), most of the time, we observe the out-sample MSE is smaller when we have the correct regression model (without $x_2$).
+- For each model, the out-sample MSE is bigger than the in-sample MSE. Intuitively, OLS is trying to minimize the the in-sample MLE. Therefore, the out-of-sample MLE tends to be bigger than the in-sample MLE. 
+
+3. Using Hansen's formula, we calculate the out-of-sample MSE for regression one and two (with $x_2$ in the regression), the values are `r MSE_1` and  `r MSE_2`. They are the same as by simulation.  
+
+
+

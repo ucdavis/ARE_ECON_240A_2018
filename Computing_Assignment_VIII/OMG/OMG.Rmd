@@ -1,0 +1,266 @@
+---
+title: "Computing Assignment VIII"
+author: "OMG"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r}
+library(MASS)
+library(broom)
+library(modelr)
+library(tidyverse)
+library(knitr)
+
+sim_reg <- function(simul,n=100,B=200){
+ 
+ Sigma <- matrix(c(1, 0.7, 0.7, 1), 2)
+  X <- mvrnorm(n=n, c(0, 0), Sigma = Sigma)
+  y <- 1.2 + 0.3*X[,1]+1.1*X[,2]+rnorm(n)
+  df <- data_frame(y=y, X1=X[,1], X2=X[,2])
+  ## reg
+  reg <- lm(y~X1+X2, data=df)
+  reg_su <- summary(reg)
+  reg_co <- tidy(reg_su)
+  co_X1 <- reg_co$estimate[2]
+  co_X2 <- reg_co$estimate[3]
+  ratio <- co_X1/co_X2
+  
+  ## Delta
+  # R <- COMPUTE IT for the three parameters
+  R <- c(0,(1/co_X2),-co_X1*(co_X2)^2) #taking derivates with respect to beta0 beta1 and beta2
+  v <- as.numeric(t(R) %*% vcov(reg_su) %*% R)
+  # W-test
+  # W_test <- COMPUTE IT
+  W_test <- (ratio-(0.3/1.1))^2/(v)
+ 
+  ## boot it:
+  x_boot <- modelr::bootstrap(df, n=B) %>%
+    mutate(reg=map(strap, ~lm(y~X1+X2, data=.)),
+           reg_su = map(reg, summary),
+           reg_co = map(reg_su, tidy),
+           ratio_b = map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+           R=map(reg_co, ~c(0,1/.$estimate[3],-.$estimate[2]*(.$estimate[3])^2)),
+           vcov_b = map2_dbl(reg_su, R, function(reg_su,R) t(R) %*% vcov(reg_su) %*% R),
+           W_test_b = map2_dbl(ratio_b, vcov_b, function(ratio_b,vcov_b) (ratio_b-0.3/1.1)^2/(vcov_b)),
+           W_test_b2 = map2_dbl(ratio_b, vcov_b, function(ratio_b,vcov_b) (ratio_b-ratio)^2/(vcov_b)))
+  x_boot2 <- x_boot %>%
+  summarise(boot_sd=sd(ratio_b),
+            boot_sd_v = mean(vcov_b),
+            boot_mean=mean(ratio_b),
+            wtest_cval=quantile(W_test_b,0.95),
+            wtest2_cval=quantile(W_test_b2,0.95))
+
+## results: original Wald and va, and boot aggregates
+results <- data_frame(simul=simul,co_X1=co_X1, co_X2=co_X2, ratio=ratio,
+           W_test=W_test,
+           v=v) %>%
+  bind_cols(x_boot2)
+
+return(results)
+}
+
+S <-200
+
+res_gr <- mapply(sim_reg, simul=1:S,SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+
+res_gr <- res_gr %>%
+  mutate (W_test2 =(ratio-(0.3/1.1))^2/(boot_sd)^2,
+          W_test_anderson=(ratio-(0.3/1.1))^2/var(ratio),
+          reject = ifelse(W_test>qchisq(0.95,3),1,0),
+          reject2 = ifelse(W_test2>qchisq(0.95,1),1,0),
+          reject3 = ifelse(W_test>wtest_cval,1,0),
+          reject4 = ifelse (W_test>wtest2_cval,1,0),
+          reject_A= ifelse(W_test_anderson>qchisq(0.95,1),1,0)) 
+```
+   
+##Questions 1, 2, and 3
+
+**Exact variance:** 0.0248  
+**Asymptotic variance:** 0.0287  
+**Bootstrap variance:** 0.0331  
+
+Bootstrap would overestimate the variance compared to the delta method.  However, they both have a higher variance than the true variance.
+Thus, the test statistic we get would be lower and the probability of rejecting would be lower than the size.
+
+```{r}
+#Question 1
+# var(res_gr$ratio)
+#[1] 0.0247811
+# mean(res_gr$v)
+#[1] 0.02872097
+# mean((res_gr$boot_sd)^2)
+#[1] 0.0331291
+```
+
+We used the delta method v to calculate the W_test and if the delta method is perfect, then we would have a critical value of 7.81 but now it is **3.186**.  
+
+```{r}
+#> quantile(res_gr$W_test,0.95)
+#95% 
+#3.18603 
+```
+
+For the bootstrap, we have the average of the 95th quantile as **9.657** when $H_0$ is true and **4.502** when the estimated value is true.  
+
+```{r}
+#> mean(res_gr$wtest_cval) - H0 is true
+#[1] 9.657381
+#> mean(res_gr$wtest2_cval) - estimated value is true. 
+#[1] 4.502043
+#params_df <-expand.grid(S=1:S) %>%
+#as.tbl
+```
+
+The average rejection rate of the Wald test is **0.015**.
+
+```{r}
+#mean(res_gr$reject)
+#[1] 0.015
+```
+
+##Questions 4, 5, and 6
+
+The significance of the Wald test using the bootstrap variance is 0.03 which is still lower than the size but better than the previous one.
+
+```{r include=FALSE}
+mean(res_gr$reject2)
+
+
+mean(res_gr$reject3)
+mean(res_gr$reject4)
+```
+
+```{r}
+#Size table
+
+stats_coef <- res_gr %>%
+  summarise(m1=mean(reject),
+            m2=mean(reject2),
+            m3=mean(reject3),
+            m4=mean(reject4),
+            m5=mean(reject_A)) 
+
+kable(stats_coef)
+```
+  
+
+For reject3, it never rejects as the test statistic gets larger when we have an outlier bootstrap sample, the critical value gets even higher, then we never get to reject the hypothesis.
+
+##Question 7
+
+Since now the hypothesis test is linear and we have $R=(0, 1, -0.3/1.1)$, we expect both the bootstrap and the linear regression to generate a test statistic whose distribution is close to $X^2$, and we expect the rejection rate to be close to the size, $0.05$.
+
+```{r}
+#sims_all_df <- map2(100,200,~rerun(S,sim_reg(n=.x,B=.y))) %>%
+#bind_rows() %>%
+#as_data_frame()
+```
+
+
+```{r}
+library(MASS)
+library(tidyverse)
+
+##
+## Attaching package: 'MASS'
+## The following object is masked from 'package:dplyr':
+##
+## select
+select <- dplyr::select
+library(modelr)
+## generate data
+n <- 100
+S <- matrix(c(1, 0.5, 0.5, 1), 2)
+set.seed(2018)
+X <- mvrnorm(n = n, mu=c(0,0), Sigma=S)
+y <- 1.2 + 0.3 * X[,1]+rnorm(n)
+data_df <- data_frame(y=y, x1=X[,1], x2=X[,2])
+## cross validation
+crossval_df <- crossv_kfold(data_df, k = n)
+crossval <- crossval_df %>%
+  mutate(reg1 = map(train, ~lm(y~x1, data=.)),
+         reg2 = map(train, ~lm(y~x1+x2, data=.))) %>%
+  gather(model, reg, reg1, reg2) %>%
+  mutate(resids_out = map2_dbl(reg, test, ~ predict(.x, newdata=.y)-as_data_frame(.y)$y),
+         mse_in = map_dbl(reg, ~mean(residuals(.)^2)),
+         mse_out = map_dbl(resids_out, ~mean(.^2))) %>%
+  gather(mse, value, mse_in, mse_out)
+```
+
+## Part 2, Question 1
+
+The **crossval_df** object has 100 observations and 3 variables.  Each cell has a list that contains a "pointer" to a dataframe excluding observation in position i of the original dataset.  
+
+**mse** is a variable indicating the type of mse (in or out);  
+**model** is a variable specifiying if we estimate the full model or the on with x1 only;  
+**value** is the computed value of MSE for the given combination (model x mse type)  
+
+The line containing **resids_out = map2_dbl...** generates the residual of observation i when the model is trained in a sample excluding observation i.  
+
+## Question 2:
+
+Considering that variables X1 and X2 are positively correlated, the beta of model 1 will be upward biased; and the errors as well.
+
+```{r}
+library(knitr)
+library(kableExtra)
+stats_coef <- crossval  %>%
+  group_by(model, mse) %>%
+  summarise(mean_mse=mean(value))
+
+kable(stats_coef, digits = 3, caption = "Table 1: MSE Comparison", format = "html")%>%
+  kable_styling(font_size = 22)
+
+```
+
+
+When comparing the **in-sample mse** across both models, we expect MSE of model 1 to be higher (this is observed in the simulation).  When comparing the **out-sample model**, we still expect the MSE of model 1 to be higher than the one from model 2 (also observed in the simulation).
+
+##Question 2
+
+The difference between the MSEs is lower for the out-sample MSE. Removing an observation from the out-sample leaves one less observation when estimating model 1. Hence, this can "on average" make the estimates of model 1 closer to the real DGP.
+
+There are two possible cases when excluding an observation from the estimates of model 1.  If the omitted observation was an outlier, then the fit of the estimate of model 1 in the training sample will be closer to the real DGP estimates. If the omitted observation was not an outlier, it won't make the fit better or worse.  Hence MSE is expected to reduce or stay the same for the out-sample computations.
+
+We also observe that the MSE-out is always higher than the MSE-in.  In the in sample case the observation predicted is being used to fit the model, hence the error is expected to be lower than for the out-sample case.
+
+##Question 3
+
+```{r include=FALSE}
+#full model
+full_samp_est <- lm(y~.,data=data_df) 
+summary(full_samp_est)
+hv_full <- hatvalues(full_samp_est)
+size=dim(data_df)
+data_df2 <- data_df%>%
+            mutate(correction=map2_dbl(residuals(full_samp_est), hv_full, ~ ((1-.y)^-2)*(.x^2)))
+mse_out_full=sum(data_df2$correction)/size[1]
+
+#reduced model
+red_samp_est <- lm(y~.-x2,data=data_df) 
+summary(red_samp_est)
+hv_red <- hatvalues(red_samp_est)
+size=dim(data_df)
+data_df3 <- data_df%>%
+  mutate(correction=map2_dbl(residuals(red_samp_est), hv_red, ~ ((1-.y)^-2)*(.x^2)))
+mse_out_red=sum(data_df3$correction)/size[1]
+
+```
+
+Using Hansen's formula:
+
+The out-of-sample MSE for the full model is **1.241**.
+
+The out-of-sample MSE for the reduced model is **1.250**.  
+
+These are the same as we obtained for question 2.
