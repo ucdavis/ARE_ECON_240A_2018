@@ -1,0 +1,208 @@
+---
+title: "Assign8"
+author: "6PM"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Wald Test
+
+- $y = \beta_0 + \beta_1X_1 + \beta_2X_2 + \epsilon$
+- Let $\theta = r(\beta) = \frac{\beta_1}{\beta_2}$, it is equivalent to test $H_0: \theta = \frac{0.3}{1.1}$.
+- Let $R = \frac{\partial}{\partial \beta}r(\beta)
+= \begin{pmatrix} 0 \\ \frac{1}{\beta_2} \\ -\frac{\beta_1}{\beta_2^2} \end{pmatrix}$.
+- Given that $\sqrt{n}(\hat{\beta} - \beta) \overset{d}{\longrightarrow}N(0, V_{\beta})$, then by delta method, 
+$$\sqrt{n}(\hat{\theta} - \theta) \overset{d}{\longrightarrow}N(0, R'V_{\beta}R)$$
+
+
+## Continued
+
+- Wald test
+$$
+\begin{align}
+W &= \sqrt{n}(\hat{\theta} - \theta)' (\hat{R}'\hat{V}_{\beta}\hat{R})^{-1}\sqrt{n}(\hat{\theta} - \theta) \\
+&= (\hat{\theta} - \theta)^2(\hat{R}'\hat{V}_{\hat{\beta}}\hat{R})^{-1}
+\end{align}
+$$
+where $\hat{R} = \begin{pmatrix} 0 \\ \frac{1}{\hat{\beta}_2} \\ -\frac{\hat{\beta}_1}{\hat{\beta_2}^2} \end{pmatrix}$, $\hat{V}_{\hat{\beta}} = s^2\hat{Q}_{xx}^{-1}$
+
+```{r , results = "hide", message=FALSE}
+library(MASS) 
+library(broom) 
+library(dplyr)
+library(modelr) 
+library(tidyverse)
+library(knitr) # For knitting document and include_graphics function
+
+rm(list = ls())      # clean the workspace
+
+# Bootstrap
+sim_reg <- function(n, B){
+  Sigma <- matrix(c(1, 0.7, 0.7, 1), 2)
+  X <- MASS::mvrnorm(n=n, c(0, 0), Sigma = Sigma) 
+  y <- 1.2 + 0.3*X[,1] + 1.1*X[,2] + rnorm(n) 
+  df <- data_frame(y=y, X1=X[,1], X2=X[,2])
+  ## reg
+  reg <- lm(y~X1+X2, data=df)
+  reg_su <- summary(reg)
+  reg_co <- tidy(reg_su)
+  co_X1 <- reg_co$estimate[2] 
+  co_X2 <- reg_co$estimate[3]
+  ratio <- co_X1/co_X2
+  R <- c(0, 1/co_X2, -co_X1/co_X2^2)
+  v <- as.numeric(t(R) %*% vcov(reg_su) %*% R)
+  W_test <- (ratio - 0.3/1.1)^2/v
+  ## boot it
+  x_boot <- modelr::bootstrap(df, n=B) %>%
+    mutate(reg = map(strap, ~lm(y~X1+X2, data=.)),
+           reg_su = map(reg, summary),
+           reg_co = map(reg_su, tidy),
+           ratio_b = map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+           R = map(reg_co, ~c(0, 1/.$estimate[3], -.$estimate[2]/.$estimate[3]^2)),
+           vcov_b = map2_dbl(reg_su, R, ~t(.y) %*% vcov(.x) %*% .y),
+           W_test_b = map2_dbl(ratio_b, vcov_b, ~(.x - 0.3/1.1)^2/.y),
+           W_test_b2 = map2_dbl(ratio_b, vcov_b, ~(.x - ratio)^2/.y))
+  x_boot2 <- x_boot %>% 
+    summarise(boot_var = var(ratio_b),
+              boot_var_mean = mean(vcov_b), 
+              boot_mean = mean(ratio_b),
+              wtest_cval = quantile(W_test_b,probs = 0.95), 
+              wtest2_cval = quantile(W_test_b2,probs = 0.95))
+ ## results: original Wald and va, and boot aggregates
+  result <-data_frame(co_X1=co_X1, co_X2=co_X2, ratio=ratio, v=v,
+            W_test=W_test) %>% 
+    bind_cols(x_boot2)
+  
+  return(result)
+}
+
+S = 200
+size_gr <- expand.grid(1:S, n=100, B=200)
+simu_gr <- mapply(sim_reg, n=size_gr$n, B = size_gr$B, SIMPLIFY = FALSE) %>%
+  bind_rows() %>%
+  as_data_frame()
+
+Avar <- function(n){
+  Sigma <- matrix(c(1,0,0, 0, 1, 0.7,0, 0.7, 1), 3)
+  R_a <- c(0, 1/1.1, -0.3/1.1^2)
+  Avar = t(R_a) %*% solve(Sigma) %*% R_a %*% 1/n
+  return(Avar)
+}
+
+size_test <- simu_gr %>%
+  mutate(reject_a = (W_test > qchisq(0.95,df=1)),
+         reject_b = (W_test > wtest_cval),
+         reject_b2 = (W_test > wtest2_cval),
+         W_test_bvar = (ratio - 0.3/1.1)^2/boot_var,
+         reject_bvar = (W_test_bvar > qchisq(0.95,df=1)),
+         sig_bvar = 1- pchisq(W_test_bvar, df = 1)) %>%
+  summarise(var_ratio = var(ratio),
+            #mean_v = mean(v),
+            mean_boot_var = mean(boot_var),
+            q_Wtest = quantile(W_test, probs = 0.95),
+            #mean_wtest2_cval = mean(wtest2_cval),
+            q_chisq = qchisq(0.95,df=1),
+            mean_sig_bvar = mean(sig_bvar),
+            size_a = mean(reject_a),
+            size_b = mean(reject_b),
+            size_b2 = mean(reject_b2),
+            size_bvar = mean(reject_bvar),
+            Avar = round(Avar(100),3)
+            )
+```
+
+## Testing for the ratio of coefficients
+
+```{r variance}
+variance <- size_test %>%
+  select(var_ratio, Avar, mean_boot_var, q_Wtest,q_chisq)
+kable(variance, digits = 3, align = "c", col.names = c("var_ratio","asymp.var", "bootstrap_var","q_Wtest","q_chisq"))
+```
+
+- Q1: The exact variance of our ratio is `r round(variance$var_ratio, 3)`, compared with the asymptotic one (`r variance$Avar`) and bootstrap one (`r round(variance$mean_boot_var, 3)`), we find that the bootstrap one is usually the largest while the asymptotic one is the smallest. 
+
+- Based on this, we expect the rejection rate using asymptotic distribution to be below 5%, while the rejection rate using bootstrap critical value to be above 5%.
+
+- Q2: The 95% quantile of our Wald tests is `r round(variance$q_Wtest, 3)`, and the asymptotic one is `r round(variance$q_chisq, 3)`.
+
+## Comparing different tests
+```{r tests}
+tests <- size_test %>%
+  select(size_a, mean_sig_bvar)
+kable(tests, digits = 3, align = "c", col.names = c("size_asymp","ave_sig_bvar"))
+```
+
+- Q3: The average rejection rate of the Wald test using the asymptotic distribution is `r round(tests$size_a, 3)`. 
+
+- Q4: Replaced by bootstrap variance estimate, the average significance of modified Wald test is `r round(tests$mean_sig_bvar,3)`.
+
+- Q5: 
+
+
+## Comparing the sizes of different tests
+
+```{r size}
+size <- size_test %>%
+  select(size_a, size_bvar, size_b, size_b2)
+kable(size, digits = 3, align = "c", col.names = c("size_asymp","size_b_var", "size_b","size_b2"))
+```
+
+- Since the exact variance is usually larger than the asymptotic one, the Wald statistic tends to be smaller, the rejection rate will be below 5%.
+
+- Since bootstrap variance is larger than the asymptotic one, the Wald statistics using bootstrap variance will be smaller, which leads to over-rejection (`r size$size_bvar`). 
+
+- Since bootstrap variance is so large, the critical value of the Wald statistic centered around $\beta_1/\beta_2$ is so small that we will never reject the null. However, if we center the Wald statistic around sample estimate, we get over-rejection.
+
+## Alternative test
+
+- Q7: With linear hypothesis, $H_0: \beta_1 = 0.3/1.1\beta_2$ or $H_0: \gamma = R'\beta$, where $R' = (0, 1,-0.3/1.1)$, and we don't need to estimate R. 
+
+- We expect the test size to be closer to the theoretical one since we don't need to estimate R.
+
+
+```{r crossvalidation, results = "hide", message=FALSE}
+select <- dplyr::select 
+library(modelr)
+rm(list = ls())      # clean the workspace
+
+## generate data
+n <- 100
+S <- matrix(c(1, 0.5, 0.5, 1), 2) 
+set.seed(2018)
+X <- mvrnorm(n = n, mu=c(0,0), Sigma=S) 
+y <- 1.2 + 0.3 * X[,1]+rnorm(n)
+data_df <- data_frame(y=y, x1=X[,1], x2=X[,2]) 
+## cross validation
+crossval_df <- crossv_kfold(data_df, k = n)
+crossval <- crossval_df %>%
+  mutate(reg1 = map(train, ~lm(y~x1, data=.)),
+         reg2 = map(train, ~lm(y~x1+x2, data=.))) %>%
+  gather(model, reg, reg1, reg2) %>%
+  mutate(resids_out = map2_dbl(reg, test, ~ predict(.x, newdata=.y)-as_data_frame(.y)$y),
+         mse_in = map_dbl(reg, ~mean(residuals(.)^2)),
+         mse_out = map_dbl(resids_out, ~mean(.^2))) %>% 
+  gather(mse, value, mse_in, mse_out)
+
+MSE <- crossval %>%
+  group_by(model, mse) %>%
+  summarise(Mean_MSE = mean(value))
+
+reg1 <- lm(y~x1, data=data_df)
+reg2 <- lm(y~x1+x2, data=data_df) 
+reg_df <- data_frame(
+  name=c("reg1", "reg2"), 
+  data=list(reg1, reg2))
+outofsample <- reg_df %>%
+  summarise(
+    MSE_out1 = mean(residuals(reg1)^2/(1-hatvalues(reg1))^2),
+    MSE_out2 = mean(residuals(reg2)^2/(1-hatvalues(reg2))^2)
+  )
+```
+
+## Cross Validation
+```{r cv}
+kable(MSE, digits = 3)
+```
