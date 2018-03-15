@@ -15,11 +15,6 @@ select <- dplyr::select
 ```
 
 ```{r sim}
-Sigma <-matrix(c(1, 0.7, 0.7, 1), 2)
-X <-mvrnorm(n=n,c(0, 0), Sigma = Sigma)
-y <- 1.2 + 0.3*X[,1]+1.1*X[,2] + rnorm(n)
-
-
 sim_reg <- function(n=100, B=200) {
   Sigma <-matrix(c(1, 0.7, 0.7, 1), 2)
   X <-mvrnorm(n=n, c(0, 0), Sigma = Sigma)
@@ -34,48 +29,43 @@ sim_reg <- function(n=100, B=200) {
   co_X1 <- reg_co$estimate[2]
   co_X2 <- reg_co$estimate[3]
   
-  beta_hat <- c(co_X0, co_X1, co_X2)
-  beta_naught <- c(1.2, 0.3, 1.1) 
-  
-  ratio <- co_X1/co_X2
+  theta_hat <- 1.1*co_X1 - 0.3*co_X2
   
   ## Delta
   # R <- COMPUTE IT for the three parameters
-  R <- c(0, 1.1, -0.3)
-  v <-as.numeric(t(R) %*% 
-        vcov(reg_su) %*%
-          R)
+  R <- matrix(c(0, 1.1, -0.3),3)
+  v_theta <- as.numeric(t(R) %*% vcov(reg_su) %*% R)
+
+  
   # W-test
-  W_test <- (t(R) %*% beta_hat - t(R) %*% beta_naught) %*% 
-    (t(R) %*% v %*% R)^{-1} %*% 
-      (t(R) %*% beta_hat - t(R) %*% beta_naught)
+  W_test <- ((theta_hat)^2)/v_theta
   
   ## boot it:
   x_boot <- modelr::bootstrap(df, n=B) %>% 
-    mutate(reg=map(strap, ~lm(y~X1+X2, data=.)),
-           reg_su =map(reg, summary),
-           reg_co =map(reg_su, tidy),
-           ratio_b =map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
-           R =map(reg_co, COMPUTE ))),
-          vcov_b =map2_dbl(reg_su, R, COMPUTE)),
-          W_test_b =map2_dbl(ratio_b, vcov_b, COMPUTE centering around H0 ratio),
-          W_test_b2 =map2_dbl(ratio_b, vcov_b, COMPUTE centering around estimated ratio ))
+    mutate(reg = map(strap, ~lm(y~X1+X2, data=.)),
+           reg_su = map(reg, summary),
+           reg_co = map(reg_su, tidy),
+           theta_b = map_dbl(reg_co, ~ 1.1 * .$estimate[2] - 0.3 * .$estimate[3]),
+           vcov_b = map_dbl(reg_su, ~ t(R) %*% vcov(.) %*% R),
+           W_test_b = map2_dbl(theta_b, vcov_b, ~ ((.x)^2)/.y),
+           W_test_b2 = map2_dbl(theta_b, vcov_b, ~ ((.x - theta_hat)^2)/.y))
   x_boot2 <- x_boot %>% 
-    summarise(boot_sd=sd(ratio_b),
-              boot_sd_v =mean(vcov_b),
-              boot_mean=mean(ratio_b),
-              wtest_cval=COMPUTE,
-              wtest2_cval=COMPUTE)
-  x_boot2
+    summarise(boot_sd = sd(theta_b),
+              boot_sd_v = mean(vcov_b),
+              boot_mean = mean(theta_b),
+              wtest_cval = quantile(W_test_b, probs = c(0.95)),
+              wtest2_cval = quantile(W_test_b2, probs = c(0.95)))
   
   ## results: original Wald and va, and boot aggregates
-  data_frame(co_X1=co_X1, co_X2=co_X2, ratio=ratio,W_test=W_test,v=v) %>% 
+  data_frame(co_X1 = co_X1, co_X2 = co_X2, theta = theta_hat, W_test = W_test, var = v_theta) %>% 
     bind_cols(x_boot2)
   }
-
-
-
 ```
+
+```{r}
+results <- sim_reg()
+```
+
 
 # Cross Validation
 
