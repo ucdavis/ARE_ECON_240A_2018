@@ -33,8 +33,9 @@ sim_reg <- function(n=100, B=200) {
   
   ## Delta
   # R <- COMPUTE IT for the three parameters
-  R <- c(0, 1.1, -0.3)
+  R <- matrix(c(0, 1.1, -0.3),3)
   v_theta <- as.numeric(t(R) %*% vcov(reg_su) %*% R)
+
   
   # W-test
   W_test <- ((theta_hat)^2)/v_theta
@@ -45,10 +46,9 @@ sim_reg <- function(n=100, B=200) {
            reg_su = map(reg, summary),
            reg_co = map(reg_su, tidy),
            theta_b = map_dbl(reg_co, ~ 1.1 * .$estimate[2] - 0.3 * .$estimate[3]),
-           R = map(reg_co, c(0, 1.1, -0.3)),
-           vcov_b = map2_dbl(reg_su, R, t(.y) %*% vcov(.x) %*% .y),
-           W_test_b = map2_dbl(theta_b, vcov_b, ((.x)^2)/.y),
-           W_test_b2 = map2_dbl(theta_b, vcov_b, ((.x - theta_hat)^2)/.y))
+           vcov_b = map_dbl(reg_su, ~ t(R) %*% vcov(.) %*% R),
+           W_test_b = map2_dbl(theta_b, vcov_b, ~ ((.x)^2)/.y),
+           W_test_b2 = map2_dbl(theta_b, vcov_b, ~ ((.x - theta_hat)^2)/.y))
   x_boot2 <- x_boot %>% 
     summarise(boot_sd = sd(theta_b),
               boot_sd_v = mean(vcov_b),
@@ -63,7 +63,7 @@ sim_reg <- function(n=100, B=200) {
 ```
 
 ```{r}
-results <- sim_reg(100,200)
+results <- sim_reg()
 ```
 
 
