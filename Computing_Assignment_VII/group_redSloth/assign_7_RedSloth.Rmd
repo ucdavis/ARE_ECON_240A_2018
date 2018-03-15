@@ -1,13 +1,219 @@
 ---
 title: "Computing Assignment VII"
-author: "group"
+author: "redSloth: Tyler Hoppenfield, Daniel Mather, Iwunze Ugo"
 date: "March 9, 2018"
-output: pdf_document
+output: beamer_presentation
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## your document
+```{r allcode, include=FALSE}
+rm(list = ls())
+cat("\014")
 
+library(stargazer)
+library(tidyverse)
+library(readr)
+library(AER)
+library(knitr)
+library(broom)
+library(dplyr)
+library(xtable)
+library(kableExtra)
+
+# RSdata <- read_csv("~/Documents/Classes/Winter 2017/ECN 240A Econometrics/Section/PS7/RSdata.csv")
+RSdata <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
+
+# OLS models
+supplyOLS <- lm(data = RSdata, ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3)
+
+sOLS <- c(coef(summary(supplyOLS))["ln_fp", "Estimate"], coef(summary(supplyOLS))["ln_fp", "Std. Error"])
+
+demandOLS <- lm(data = RSdata, ln_qd ~ ln_sp + trendsp1+ trendsp2+ trendsp3)
+dOLS <- c(coef(summary(demandOLS))["ln_sp", "Estimate"], coef(summary(demandOLS))["ln_sp", "Std. Error"])
+
+# IV models
+supplyIV.firststage <- lm(data = RSdata, formula = ln_fp ~ lag_ln_w + ln_w + trendsp1 + trendsp2 + trendsp3)
+
+sFS1 <- c(coef(summary(supplyIV.firststage))["lag_ln_w", "Estimate"], coef(summary(supplyIV.firststage))["lag_ln_w", "Std. Error"])
+
+sFS2 <- c(coef(summary(supplyIV.firststage))["ln_w", "Estimate"], coef(summary(supplyIV.firststage))["ln_w", "Std. Error"])
+
+supplyIV <- ivreg(data = RSdata, formula = ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | lag_ln_w + ln_w + trendsp1 + trendsp2 + trendsp3)
+
+sIV1 <- c(coef(summary(supplyIV))["ln_fp", "Estimate"], coef(summary(supplyIV))["ln_fp", "Std. Error"])
+
+sIV2 <- c(coef(summary(supplyIV))["ln_w", "Estimate"], coef(summary(supplyIV))["ln_w", "Std. Error"])
+
+sF <- c(summary(supplyIV, diagnostics = TRUE)$diagnostics["Weak instruments", "statistic"], 1)
+
+demandIV.firststage <- lm(data = RSdata, formula = ln_sp ~ ln_w + trendsp1 + trendsp2 + trendsp3)
+
+dFS <- c(coef(summary(demandIV.firststage))["ln_w", "Estimate"], coef(summary(demandIV.firststage))["ln_w", "Std. Error"])
+
+demandIV <- ivreg(data = RSdata, formula = ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w + trendsp1 + trendsp2 + trendsp3)
+
+dIV <- c(coef(summary(demandIV))["ln_sp", "Estimate"], coef(summary(demandIV))["ln_sp", "Std. Error"])
+
+dF <- c(summary(demandIV, diagnostics = TRUE)$diagnostics["Weak instruments", "statistic"], 1)
+
+sIV1.RS <- c(0.096, 0.025)
+sIV2.RS <- c(1.229, 0.138)
+sFS1.RS <- c(-3.628, 0.945)
+sFS2.RS <- c(-2.276, 1.294)
+sF.RS <- c(14.73, 1)
+dIV.RS <- c(-0.055, 0.024)
+dFS.RS <- c(-4.655, 1.300)
+dF.RS <- c(12.81, 1)
+sOLS.RS <- c(0.020, 0.031)
+dOLS.RS <- c(-0.018, 0.010)
+
+results.table <- round(matrix(c(sIV1, sIV1.RS, sIV2, sIV2.RS, sFS1, sFS1.RS, sFS2, sFS2.RS, sF, sF.RS, dIV, dIV.RS, dFS, dFS.RS, dF, dF.RS, sOLS, sOLS.RS, dOLS, dOLS.RS), ncol = 2, byrow = TRUE), 3)
+  
+colnames(results.table) <- c("Estimate","Std. Error")
+
+redSloth.coefs <- round(c(sOLS[1], sIV1[1], sIV2[1], sFS1[1], sFS2[1], sF[1], dOLS[1], dIV[1], dFS[1], dF[1]),3)
+
+RS.coefs <- c(sOLS.RS[1], sIV1.RS[1], sIV2.RS[1], sFS1.RS[1], sFS2.RS[1], sF.RS[1], dOLS.RS[1], dIV.RS[1], dFS.RS[1], dF.RS[1])
+
+coef.results <- cbind(redSloth.coefs, RS.coefs)
+
+redSloth.se <- round(c(sOLS[2], sIV1[2], sIV2[2], sFS1[2], sFS2[2], NA, dOLS[2], dIV[2], dFS[2], NA),3)
+
+RS.se <- c(sOLS.RS[2], sIV1.RS[2], sIV2.RS[2], sFS1.RS[2], sFS2.RS[2], NA,  dOLS.RS[2], dIV.RS[2], dFS.RS[2], NA)
+
+se.results <- cbind(redSloth.se, RS.se)
+
+results.all <- cbind(coef.results, se.results)
+results.all[6,3:4] <- c("","")
+results.all[10,3:4] <- c("","")
+rownames(results.all) <- c("$\\beta_{s(OLS)}$","$\\beta_{s(IV)}$","$\\omega_{t(IV)}$","$\\omega_{t-1(FS)}$","$\\omega_{t(FS)}$","$F_{s(FS)}$","$\\beta_{d(OLS)}$","$\\beta_{d(IV)}$","$\\omega_{t(FS)}$","$F_{d(FS)}$")
+```
+
+#OLS/IV Regressions
+```{r test, echo = FALSE}
+kable(results.all, caption = "Regression results")
+```
+
+#OLS/IV Regressions Comment
+One substantial difference is the estimate of supply elasticity from the OLS regression. Here our estimate is much higher than RS. This is because we include the weather (or yield) shock, while RS only use the uninstrumented price. \textbf{Removing $\boldsymbol{\omega_t}$ lowers $\boldsymbol{\beta_{s(OLS)}}$ to 0.038.}
+
+#Hausman Test for Endogeneity
+```{r Hausmansetup, include=FALSE}
+#Note that this large block is setup lifted straight out of dan's work.
+rm(list = ls())
+cat("\014")
+
+library(stargazer)
+library(tidyverse)
+library(readr)
+library(AER)
+library(knitr)
+library(broom)
+library(dplyr)
+
+#RSdata <- read_csv("S:/Graduates/dmather/240a/redSlothPS7/RSdata.csv")
+# RSdata <- read_csv("~/Documents/Classes/Winter 2017/ECN 240A Econometrics/Section/PS7/RSdata.csv")
+RSdata <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
+
+# OLS models
+
+# supply model
+supplyOLS <- lm(data = RSdata, ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3)
+supplyOLS_lnw <- lm(data = RSdata, ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3)
+
+summary(supplyOLS)
+
+# demand model
+demandOLS <- lm(data = RSdata, ln_qd ~ ln_sp + trendsp1+ trendsp2+ trendsp3)
+
+summary(demandOLS)
+
+# The OLS coefficient for supply elasticity is XXX, which is somewhat close to the coefficient estimated in RS (XXX). Similary, the demand coefficients are similar as well (XXX vs. XXX). The authors, RS, use the OLS model to highlight the endogeneity of the price, which is shown through the likely underestimated supply elasticity and the likely overestimated demand elasticity. They estimate the OLS regressions without instrumenting prices, which is why the term ln_w is not included in the regression here.
+
+# IV models
+
+#supply model
+supplyIV.firststage <- lm(data = RSdata, formula = ln_fp ~ lag_ln_w + ln_w + trendsp1 + trendsp2 + trendsp3)
+
+supplyIV <- ivreg(data = RSdata, formula = ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | trendsp1 + trendsp2 + trendsp3 + ln_w + lag_ln_w)
+
+supplyIV_nolnw <- ivreg(data = RSdata, formula = ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 | trendsp1 + trendsp2 + trendsp3 + ln_w + lag_ln_w)
+
+
+us <- c(coef(summary(supplyIV))["ln_fp","Estimate"], +
+  coef(summary(supplyIV))["ln_fp","Std. Error"], +
+  coef(summary(supplyIV))["ln_w","Estimate"], +
+  coef(summary(supplyIV))["ln_w","Std. Error"], +
+  coef(summary(supplyIV.firststage))["lag_ln_w","Estimate"], +
+  coef(summary(supplyIV.firststage))["lag_ln_w","Std. Error"], +
+  coef(summary(supplyIV.firststage))["ln_w","Estimate"], +
+  coef(summary(supplyIV.firststage))["ln_w","Std. Error"])
+
+rs <- c(0.096, 0.025, 1.229, 0.138, -3.628, 0.945, -2.276, 1.294)
+
+compare.supplyIV <- data.frame(US = us, RS = rs)
+row.names(compare.supplyIV) <- c("Supply elas.", "(std. error)", "Shock w(t)", "(std. error2)", "First stage w(t-1)", "(std. error3)", "First stage w(t)", "std. error4")
+
+# demand model
+
+demandIV.firststage <- lm(data = RSdata, formula = ln_sp ~ ln_w + trendsp1 + trendsp2 + trendsp3)
+
+summary(demandIV.firststage)
+
+demandIV <- ivreg(data = RSdata, formula = ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | trendsp1 + trendsp2 + trendsp3 + ln_w)
+
+summary(demandIV)
+
+# Our estimates of the supply and demand elasticities are similar to those in the RS paper.
+```
+
+
+```{r include =FALSE}
+#This block is more hausman-specific setup from dan's work
+library(MASS)
+require(Matrix)
+#per Hausman's original paper, we assume cov(B^IV, B^OLS) is zero and that our sample variance is an unbiased estimator of asymptotic variance. This may not be a reliable assumption in all cases.
+
+hausman <- function(betaiv, iv, betaols,ols) {
+  stat <- t(betaols - betaiv)%*%ginv(vcov(iv)-vcov(ols))%*%(betaols-betaiv)
+  rank <- rankMatrix(vcov(iv)-vcov(ols))
+  chisq <- qchisq(0.95,df=rank)
+  return(cbind(stat,chisq))
+  
+}
+
+hausman_supplyIV <- hausman(supplyIV$coefficients, supplyIV ,supplyOLS_lnw$coefficients,supplyOLS_lnw)
+
+hausman_supplyIV_nolnw <-  hausman(supplyIV_nolnw$coefficients,supplyIV_nolnw,supplyOLS$coefficients,supplyOLS)
+
+hausman_demandOLS <- hausman(demandIV$coefficients,demandIV,demandOLS$coefficients,demandOLS)
+```
+```{r echo = FALSE}
+#Display's Dan's results
+print("Supply IV Hausman")
+hausman_supplyIV
+print("Supply IV Hausman (no lnw)")
+hausman_supplyIV_nolnw
+print("Demand OLS Hausman")
+hausman_demandOLS
+
+```
+#Alternate Variable for Supply
+```{r q4, results='asis', echo=FALSE}
+RSdata$ln_a <- log(RSdata$area)
+RSdata$ln_y <- log(RSdata$yield_shock)
+
+supplyIV.area <- ivreg(data = RSdata, formula = ln_a ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | lag_ln_w + ln_w + trendsp1 + trendsp2 + trendsp3)
+
+supplyIV.yield <- ivreg(data = RSdata, formula = ln_y ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | lag_ln_w + ln_w + trendsp1 + trendsp2 + trendsp3)
+
+stargazer(supplyIV.area, supplyIV.yield, header = FALSE, keep = c("ln_fp","ln_w"), title = "Using Area or Yield for Supply", font.size="small")
+```
+
+
+#Question 5 and 6
+1. The additional seven years of data have only a moderate impact on our results--this could be responsible for some of the differences we see from the published results.
+2. The data as posted is in proprietary Stata format, and unnecessarily spread across multiple files.  This is not best practice, and makes it more difficult to understand the data structure and contents.

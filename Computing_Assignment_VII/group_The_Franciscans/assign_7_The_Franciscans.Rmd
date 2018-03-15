@@ -1,6 +1,6 @@
 ---
 title: "Computing Assignment VII"
-author: "group"
+author: "The Franciscans"
 date: "March 9, 2018"
 output: ioslides_presentation
 smaller: true
@@ -13,63 +13,84 @@ library(knitr)
 library(tidyverse)
 library(AER)
 library(matlib)
+library(kableExtra)
 ```
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 remove(list = ls())
 
 #data
 data_RS <- read_csv("https://raw.githubusercontent.com/ucdavis/ARE_ECON_240A_2018/master/Computing_Assignment_VII/data/RSdata.csv")
 ```
 
-## 1. Estimate OLS model
-```{r}
+```{r include=FALSE}
 # OLS supply incl ln_w
 OLS_supply <- lm(ln_qs~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
-summary(OLS_supply)
-  # Coefficient on ln_fp (8.876e-02) same sign, but significant (t=7.628) and half the magnitude
 
 # OLS supply excl ln_w
 OLS_supply_exclw <- lm(ln_qs~ln_fp + trendsp1 + trendsp2 + trendsp3, data=data_RS)
-summary(OLS_supply_exclw)
 
 # OLS demand
 OLS_demand <- lm(ln_qd~ln_sp + trendsp1 + trendsp2 + trendsp3, data=data_RS)
-summary(OLS_demand)
-  # Coefficient on ln_sp same sign, similar magnitude, but insignificant
 ```
 
-## 2. Estimate IV model
-```{r}
+```{r include=FALSE}
 IV_supply <- ivreg(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | lag(ln_w) + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
-summary(IV_supply)
-  # Coefficient same sign and similar magnitude, standard error also similar (0.101652)
 
 IV_supply_exclw <- ivreg(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 | lag(ln_w) + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
-summary(IV_supply_exclw)
 
 IV_demand <- ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
-summary(IV_demand)
-  # Coefficient on ln_sup same sign, similar magnitude, similar standard error
 ```
 
-## 3. Hausman tests for supply model 
+## Estimate OLS and IV: full model {.smaller}
+Using OLS, our estimated supply elasticity is the same sign as but four times as large as the RS estimate (0.089 vs. 0.020), and highly significant where theirs is not. Using IV, our estimate is very similar to the RS estimate: 0.102 vs. 0.096 with the same s.e. (0.025). 
 ```{r}
+kable(cbind(summary(OLS_supply)$coefficients,summary(IV_supply)$coefficients), caption = "Supply", digits = 3, format = "html") %>%
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" ", "OLS" = 4, "IV" = 4))
+```
+
+## Estimate OLS and IV: full model {.smaller}
+Using OLS, our estimated demand elasticity is very close to the RS estimate: -0.017 vs. -0.018 with s.e. of 0.011 vs. 0.010. Using IV, our estimate is also very similar: -0.063 vs. -0.055 with s.e.of  0.023 vs. 0.024. 
+```{r}
+kable(cbind(summary(OLS_demand)$coefficients,summary(IV_demand)$coefficients), caption = "Demand", digits = 3, format = "html") %>%
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" ", "OLS" = 4, "IV" = 4))
+```
+
+## Estimate OLS and IV: excl. ln_w {.smaller}
+If we exclude the yield shock from the OLS model and include it only as an instrument in the IV model, our OLS estimate of the supply elasticity becomes closer to RS: now 0.38 with a s.e. of 0.24. The IV estimates also change as the yield shock is included only as an instrument and not as a control in the main regression -- the estimate is now -0.072 with s.e. 0.55. This is not surprising because ln_w was highly significant in the full model, so removing it will result in the estimates being biased.
+```{r}
+kable(cbind(summary(OLS_supply_exclw)$coefficients,summary(IV_supply_exclw)$coefficients), caption = "Supply", digits = 3, format = "html") %>%
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" ", "OLS" = 4, "IV" = 4))
+```
+
+## Hausman tests for supply model 
+The Chi-sq critical value for 5% significance with 6 d.f. (full model) is 12.59, and with 5 d.f. (model without ln_w) is 11.07. Therefore in neither case do we reject the null that OLS is consistent and efficient. 
+```{r include=FALSE}
 # full model including ln_w
 beta_diff <- coefficients(OLS_supply) - coefficients(IV_supply)
 cov_diff <- vcov(IV_supply) - vcov(OLS_supply)
 Hs = t(beta_diff) %*% Ginv(cov_diff) %*% beta_diff
-Hs
 
-# model excluding ln_w -- how do we do this when the matrices are different sizes?? 
+# model excluding ln_w 
 beta_diff_exclw <- coefficients(OLS_supply_exclw) - coefficients(IV_supply_exclw)
 cov_diff_exclw <- vcov(IV_supply_exclw) - vcov(OLS_supply_exclw)
 Hs_exclw = t(beta_diff_exclw) %*% Ginv(cov_diff_exclw) %*% beta_diff_exclw
-Hs_exclw
 ```
 
-## 4. Supply model w/ area
-```{r}
+```{r echo=FALSE}
+kable(t(c(Hs, Hs_exclw)), col.names = c("Full model", "Without ln_w"), digits = 3, caption = "Hausman tests for OLS vs. IV", format = "html") %>%
+  kable_styling(full_width = F) 
+```
+
+ 
+## Supply model w/ area instead of total quantity {.smaller}
+We see that the estimated area elasticity is smaller (0.07) than the supply elasticity, which is in like with Roberts & Schlenker, and our point estimates are similar to theirs as well. 
+```{r include=FALSE}
+data_RS <- mutate(data_RS, ln_area = log(area))
+
 OLS_supply_area <- lm(ln_area~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data=data_RS)
 summary(OLS_supply_area)
 
@@ -77,4 +98,26 @@ IV_supply_area <- ivreg(ln_area~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | 
 summary(IV_supply_area)
 ```
 
-## 5., 6. Comments about canvas vs. RS dataset
+```{r echo=FALSE}
+kable(cbind(summary(OLS_supply_area)$coefficients,summary(IV_supply_area)$coefficients), caption = "Supply", digits = 3, format = "html") %>%
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" ", "OLS" = 4, "IV" = 4))
+```
+
+## What happens if we exclude the extra 7 years of data? {.smaller}
+
+If we re-run the full supply model excluding the 2008-2014 data, the OLS and IV estimates barely change.  Our OLS estimate was 0.089 before with s.e. 0.012 and now it is 0.097 with s.e. 0.013. Our IV estimate was 0.102 before with s.e. 0.025 and now it is 0.103 with s.e. 0.024.
+```{r include=FALSE}
+OLS_supply_RS <- lm(ln_qs~ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data=filter(data_RS, year<2008))
+
+IV_supply_RS <- ivreg(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3 | lag(ln_w) + ln_w + trendsp1 + trendsp2 + trendsp3, data=filter(data_RS, year<2008))
+```
+
+```{r echo=FALSE}
+kable(cbind(summary(OLS_supply_RS)$coefficients,summary(IV_supply_RS)$coefficients), caption = "Supply, data through 2007", digits = 3, format = "html") %>%
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" ", "OLS" = 4, "IV" = 4))
+```
+
+## Comments on organization of Canvas vs. RS dataset {.smaller}
+The RS data must be constructed by running a sequence of do files and merging datasets. This is helpful in that it is transparent and allows us to see how each of the variables are constructed. However, the canvas data is cleaner for running these specific regressions because from the RS dataset it is difficult to tell in which ultimate form the data are being used. 

@@ -12,11 +12,11 @@ library(readr)
 library(tidyverse)
 ```
 
-```{r import}
+```{r import, include=FALSE}
 data <- read_csv("RSdata.csv")
 ```
 
-```{r OLS_reg}
+```{r OLS_reg, include=FALSE}
 OLS_sup_w <- lm(ln_qs ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
 OLS_dmd <- lm(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3, data = data)
 OLS_sup_now <- lm(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data = data)
@@ -25,14 +25,14 @@ summary(OLS_sup_now)
 summary(OLS_dmd)
 ```
 
-```{r IV_reg}
+```{r IV_reg, include=FALSE}
 IV_sup <- ivreg(ln_qs ~ ln_fp + trendsp1 + trendsp2 + trendsp3 | lag_ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
 IV_dmd <- ivreg(ln_qd ~ ln_sp + trendsp1 + trendsp2 + trendsp3 | ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
 summary(IV_sup)
 summary(IV_dmd)
 ```
 
-```{r hausman_test}
+```{r hausman_test, include=FALSE}
 sup_coef_ols_w <- coef(OLS_sup_w)["ln_fp"]
 sup_coef_ols_now <- coef(OLS_sup_now)["ln_fp"]
 sup_coef_IV <- coef(IV_sup)["ln_fp"]
@@ -56,7 +56,7 @@ pchisq(hausman_w, df = 1)
 pchisq(hausman_now, df = 1)
 ```
 
-```{r regs_with_area}
+```{r regs_with_area, include=FALSE}
 data <- mutate(data, ln_area = log(area))
 OLS_sup_area_w <- lm(ln_area ~ ln_fp + ln_w + trendsp1 + trendsp2 + trendsp3, data = data)
 OLS_sup_area_now <- lm(ln_area ~ ln_fp + trendsp1 + trendsp2 + trendsp3, data = data)
@@ -88,7 +88,7 @@ Since we have performed two supply regressions previously, in one case including
 In the first case, the two supply elasticities are fairly close. The supply elasticity for total quantity is 0.089, while the supply elasticity for area alone is 0.063. Similarly, when ln_w is included in both models, we find a supply elasticity for total quantity is 0.038 and for area of 0.055.
 
 ## Sensitivity to additional data
-No, we can see that there are no qualitative differences in the results.
+No, we can see that there are no qualitative differences in the results whether or not the additional years are included.
 
-##Structure of dataset
-It is poorly organized 
+## Structure of dataset
+It is poorly organized. Variable names are difficult to iterperet. It is difficult to figure out the differences between differnt data sets. There are several do-files and data sets for the same project, which makes things messy and disorganized. 
