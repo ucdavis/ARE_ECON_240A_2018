@@ -1,0 +1,181 @@
+---
+title: "Assignment 8"
+author: "USER"
+date: "March 12, 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+## Testing for the ratio of coefficients
+
+Given our DGP (conditional homoskedasticity), we have  
+$$\sqrt{n} (\hat{\beta}-\beta) \rightarrow_d N(0, \sigma^2 Q_{xx}^{-1})$$
+Then by Delta method,
+$$\sqrt{n}(\frac{\hat{\beta}_1}{\hat{\beta}_2} - \frac{\beta_1}{\beta_2}) = \frac{1}{\beta_2}\sqrt{n}(\hat{\beta}_1-\beta_1) - \frac{\beta_1}{\beta_2^2}\sqrt{n}(\hat{\beta}_2-\beta_2) + o_p(1) \rightarrow_dN(0, \sigma^2 R' Q_{xx}^{-1}R), R'=(0, \frac{1}{\beta_2}, -\frac{\beta_1}{\beta_2^2})$$
+Therefore, we can construct the following Wald test statistics under $H_0:\frac{\beta_1}{\beta_2}=\frac{0.3}{1.1}$, which follows $\chi^2(1)$ distribution.
+$$W=\frac{n(\frac{\hat{\beta}_1}{\hat{\beta}_2} - \frac{0.3}{1.1})^2}{s^2R'\hat{Q}_{xx}^{-1}R}, s^2=\frac{1}{n-3}\sum_{i=1}^{n}(y_i-x_i'\hat{\beta})^2, \hat{Q}_{xx}=\frac{1}{n}\sum_{i=1}^{n}x_ix_i', R'= (0,\frac{1}{1.1}, -\frac{0.3}{1.21})$$
+
+```{r ratio 0}
+library(MASS)
+library(broom)
+library(modelr)
+library(tidyverse)
+library(knitr)
+
+rm(list=ls())
+
+sim_reg <- function(n=100L, B=200){
+  ## DGP
+  Sigma <- matrix(c(1, 0.7, 0.7, 1), 2)
+  X <- mvrnorm(n=n, c(0, 0), Sigma = Sigma)
+  y <- 1.2 + 0.3*X[,1]+1.1*X[,2]+rnorm(n) # conditional homoskedastic
+  df <- data_frame(y=y, X1=X[,1], X2=X[,2])
+  
+  ## reg
+  reg <- lm(y~X1+X2, data=df)
+  reg_su <- summary(reg)
+  reg_co <- tidy(reg_su)
+  co_X1 <- reg_co$estimate[2]
+  co_X2 <- reg_co$estimate[3]
+  ratio <- co_X1/co_X2
+  
+  ## Delta
+  R <- matrix(c(0, 1/1.1, -0.3/1.1^2))
+  v <- as.numeric(t(R) %*% vcov(reg_su) %*% R) 
+  # s^2*Qxx^(-1)
+  
+  ## W-test
+  W_test <- (ratio-.3/1.1)^2/v
+  
+  ## boot it:
+  x_boot <- modelr::bootstrap(df, n=B) %>%
+    mutate(reg=map(strap, ~lm(y~X1+X2, data=.)),
+           reg_su = map(reg, summary),
+           reg_co = map(reg_su, tidy),
+           ratio_b = map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+           R_b = map(reg_co, ~matrix(c(0, 1/co_X2, -co_X1/co_X2^2))),
+           vcov_b = map2_dbl(reg_su, R_b, ~as.numeric(t(.y) %*% vcov(.x) %*% .y)),
+           W_test_b  = map2_dbl(ratio_b, vcov_b, ~(.x-.3/1.1)^2/.y), 
+                       # centered around the true values
+           W_test_b2 = map2_dbl(ratio_b, vcov_b, ~(.x-co_X1/co_X2)^2/.y)
+                       # centered around the estimated values
+           )
+  x_boot2 <- x_boot %>%
+    summarise(boot_v = var(ratio_b),
+              boot_est_v = mean(vcov_b),
+              boot_mean = mean(ratio_b-ratio),
+              wtest_cval = quantile(W_test_b,.95),
+              wtest2_cval = quantile(W_test_b2,.95)
+             )
+  x_boot2
+
+  ## results: original Wald and va, and boot aggregates
+  data_frame(co_X1=co_X1, co_X2=co_X2, ratio=ratio, W_test=W_test,v=v) %>%
+             bind_cols(x_boot2)
+}
+
+set.seed(1234)
+results = replicate(200, sim_reg(), simplify = F) %>% bind_rows() %>%     
+          as_data_frame()
+
+kable(data.frame(exact = var(results$ratio), # Exact variance
+           asympt = mean(results$v), # Asympt variance
+           boot = mean(results$boot_v) # Bootstrap variance
+           ),
+      digits = 3, caption = "Table 1. Variances"
+)
+```
+
+1. Asympt variance is smaller than exact variance but the boot variance is a little bit higher than exact variance.  
+2. The test size based on the asymptotic variance tends to be higher while it tends to be below 5% based on the boot variance but should be very close.
+
+```{r ratio 1}
+kable(data.frame(wald.test = as.numeric(quantile(results$W_test,.95)), asymptotic.d = qchisq(.95,1), reject.rate=mean(results$W_test>qchisq(.95,1))), digits = 2, caption = "Table 2. 95%-tile Values of Wald Test Stat & its Asymptotical Distribution")
+
+```
+
+3. the 95%-tile value is larger for the wald test than for the asymptotical distribution and thus renders a higher rejection rate, which is compatible with the lower asymp variance estimte.     
+
+```{r ratio 2}
+modified_wald = (results$ratio-.3/1.1)^2/results$boot_v
+test.size = data.frame(cbind(c(as.numeric(quantile(modified_wald,.95)), 
+                               mean(results$wtest_cval), 
+                               mean(results$wtest2_cval)),
+                  c(mean(1-pchisq(modified_wald, df=1) < .05), 
+                    mean(results$W_test>results$wtest_cval), 
+                    mean(results$W_test>results$wtest2_cval))
+                  ))
+dimnames(test.size)[[1]]=c("modified.wald", "boot.true", "boot.est")
+dimnames(test.size)[[2]]=c("critical.value","reject.rate")
+kable(test.size, digits = 3, caption = "Table 2. Sizes of Different Wald tests")
+```
+
+4. The Modified Wald test gives the accurate size since its modified variance is close to the exact one and its critical value is also close to the asymptotical one.  
+5. The Wald test size under the bootstrapped distribution using true betas is lower than 5% while the Wald test size under the bootstrapped distribution using estimated betas is higher than 5%. Here are two factors affecting the rejection rates: heavy tail and upperward bias. The lower one is mainly due to upperward bias while the higher one is mainly due to heavy tail. Here are some supporting evidence as follows.
+
+```{r ratio 3}
+ggplot(data=results, aes(x=W_test)) +
+  geom_histogram() + 
+  stat_function(fun=dchisq,args=list(df=1))
+```
+  
+## Cross-Validation
+```{r cv1}
+rm(list=ls())
+library(MASS)
+
+## select
+select <- dplyr::select
+library(modelr)
+
+## generate data
+n <- 100
+S <- matrix(c(1, 0.5, 0.5, 1), 2)
+set.seed(2018)
+X <- mvrnorm(n = n, mu=c(0,0), Sigma=S)
+y <- 1.2 + 0.3 * X[,1]+rnorm(n)
+data_df <- data_frame(y=y, x1=X[,1], x2=X[,2])
+
+## cross validation
+crossval_df <- crossv_kfold(data_df, k = n)
+crossval <- crossval_df %>%
+  mutate(reg1 = map(train, ~lm(y~x1, data=.)),
+         reg2 = map(train, ~lm(y~x1+x2, data=.))) %>%
+  gather(model, reg, reg1, reg2) %>%
+  mutate(resids_out = map2_dbl(reg, test, ~ predict(.x, newdata=.y)-as_data_frame(.y)$y),
+         mse_in = map_dbl(reg, ~mean(residuals(.)^2)),
+         mse_out = map_dbl(resids_out, ~mean((.)^2))) %>%
+  gather(mse, value, mse_in, mse_out)
+```
+
+1. crossval_df: a 100 by 3 object, 100 resamples and 3 attributes (characters, 100 by 1) corresponding to each resample (train column, the observation indexes that are used to train the model (99 observations); test column, the observation index that is used to test the model(1 observation); id column, the identifiers for either in or out of sample).  
+
+2. crossval: model column, the identifiers of which model (1 or 2) that is used; mse column, the identifiers for either in or out of sample; value column, MSE values.
+
+3. The resids_out line computes out-of-sample prediction residuals; .x and .y, refered to reg and test, respectively.
+
+```{r cv2}
+# MSE Summary #
+kable(crossval %>%
+  group_by(model, mse) %>%
+  summarise(mean_MSE = mean(value)),
+  digits = 3, caption = "Table 3. MSEs")
+```
+
+1. Out-of-sample MSEs are larger than in-sample MSEs for both regressions, as expected.
+2. In-sample MSE smaller for reg2 as expected since MSE always decreases as more variables are added.
+3. Out-of-sample MSE slightly smaller for reg2 than for reg1, indicating that adding X2 does not increase the predictive power very much
+
+```{r cv3}
+reg1 = lm(y~X[,1])
+reg2 = lm(y~X[,1]+X[,2])
+kable(data.frame(MSE1.out.hansen = mean((reg1$resid)^2/(1-hatvalues(reg1))^2),
+           MSE2.out.hansen = mean((reg2$resid)^2/(1-hatvalues(reg2))^2)
+           ),
+      digits = 3, caption = "Table 4. Hansen Formula MSEs")
+```
+
+Using the formula to compute MSE gives similar (exact) results as from the simulation. In the case of n-fold (Leave-one-out) CV, there is no randomness from the CV selection so they should match exactly.
