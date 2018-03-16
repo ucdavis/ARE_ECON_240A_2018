@@ -97,6 +97,7 @@ ratio_squared <- (sim_results[,3])^2
 ratio_squared_avg <- colMeans(ratio_squared)
 ratio_var <-  ratio_squared_avg[1] - (sim_avg[3])^2 
 ```  
+
 # Simulations
 Our exact variance of the ratio is: `r round(ratio_var, 3)`
 
@@ -127,7 +128,7 @@ Question 5: Since the 95th percentile of the bootstrap Wald is so far out, we na
 
 ```{r, echo = FALSE}
 rm(list = ls())
-cat("\014")
+# cat("\014")
 
 library(tidyverse)
 library(MASS)
