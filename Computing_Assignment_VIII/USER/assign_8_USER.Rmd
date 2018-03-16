@@ -9,7 +9,7 @@ output: slidy_presentation
 knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
 ```
 
-## Testing for the ratio of coefficients
+## Testing for the ratio of coefficients - Theoretical Part
 
 Given our DGP (conditional homoskedasticity), we have  
 $$\sqrt{n} (\hat{\beta}-\beta) \rightarrow_d N(0, \sigma^2 Q_{xx}^{-1})$$
@@ -17,6 +17,8 @@ Then by Delta method,
 $$\sqrt{n}(\frac{\hat{\beta}_1}{\hat{\beta}_2} - \frac{\beta_1}{\beta_2}) = \frac{1}{\beta_2}\sqrt{n}(\hat{\beta}_1-\beta_1) - \frac{\beta_1}{\beta_2^2}\sqrt{n}(\hat{\beta}_2-\beta_2) + o_p(1) \rightarrow_dN(0, \sigma^2 R' Q_{xx}^{-1}R), R'=(0, \frac{1}{\beta_2}, -\frac{\beta_1}{\beta_2^2})$$
 Therefore, we can construct the following Wald test statistics under $H_0:\frac{\beta_1}{\beta_2}=\frac{0.3}{1.1}$, which follows $\chi^2(1)$ distribution.
 $$W=\frac{n(\frac{\hat{\beta}_1}{\hat{\beta}_2} - \frac{0.3}{1.1})^2}{s^2R'\hat{Q}_{xx}^{-1}R}, s^2=\frac{1}{n-3}\sum_{i=1}^{n}(y_i-x_i'\hat{\beta})^2, \hat{Q}_{xx}=\frac{1}{n}\sum_{i=1}^{n}x_ix_i', R'= (0,\frac{1}{1.1}, -\frac{0.3}{1.21})$$
+
+## Testing for the ratio of coefficients - Simulation Part 1
 
 ```{r ratio 0}
 library(MASS)
@@ -89,7 +91,7 @@ kable(data.frame(exact = var(results$ratio), # Exact variance
 )
 ```
 
-1. Asympt variance is smaller than exact variance but the boot variance is a little bit higher than exact variance.  
+1. Asympt variance is smaller than exact variance but the boot variance is just a little bit higher than exact variance.  
 2. The test size based on the asymptotic variance tends to be higher while it tends to be below 5% based on the boot variance but should be very close.
 
 ```{r ratio 1}
@@ -97,7 +99,9 @@ kable(data.frame(wald.test = as.numeric(quantile(results$W_test,.95)), asymptoti
 
 ```
 
-3. the 95%-tile value is larger for the wald test than for the asymptotical distribution and thus renders a higher rejection rate, which is compatible with the lower asymp variance estimte.     
+3. The 95%-tile value is larger for the wald test than that for the asymptotical distribution and thus renders a higher rejection rate, which is compatible with the lower asymp variance estimte. 
+
+## Testing for the ratio of coefficients - Simulation Part 2
 
 ```{r ratio 2}
 modified_wald = (results$ratio-.3/1.1)^2/results$boot_v
@@ -113,16 +117,29 @@ dimnames(test.size)[[2]]=c("critical.value","reject.rate")
 kable(test.size, digits = 3, caption = "Table 2. Sizes of Different Wald tests")
 ```
 
-4. The Modified Wald test gives the accurate size since its modified variance is close to the exact one and its critical value is also close to the asymptotical one.  
-5. The Wald test size under the bootstrapped distribution using true betas is lower than 5% while the Wald test size under the bootstrapped distribution using estimated betas is higher than 5%. Here are two factors affecting the rejection rates: heavy tail and upperward bias. The lower one is mainly due to upperward bias while the higher one is mainly due to heavy tail. Here are some supporting evidence as follows.
+1. The Modified Wald test gives the most accurate size since its modified variance is close to the exact one and its critical value is also close to the asymptotical one.  
+2. The Wald test size under the bootstrapped distribution using true betas is lower than 5% while the Wald test size under the bootstrapped distribution using estimated betas is higher than 5%. Here are two factors affecting the rejection rates: heavy tail and upperward bias. The lower one is mainly due to upperward bias while the higher one is mainly due to heavy tail. Here are some supporting evidence as follows.
 
-```{r ratio 3}
+```{r ratio 3, fig.height = 2, fig.width = 4}
 ggplot(data=results, aes(x=W_test)) +
-  geom_histogram() + 
+  geom_histogram(binwidth = 0.5) + 
   stat_function(fun=dchisq,args=list(df=1))
 ```
+
+## Testing for the ratio of coefficients - alternative test
+
+For the alternative test based on $H_o: \beta_1 - \frac{0.3}{1.1} \beta_2 = 0$, our Wald test statistics is as follows:  
+$$W=\frac{[\sqrt{n}(\hat{\beta}_1 - \beta_1) - \frac{0.3}{1.1}\sqrt{n}(\hat{\beta}_2-\beta_2)]^2} {\sigma^2 R'Q_{xx}^{-1}R}\rightarrow_d N(0, 1), R'=(0, 1, -\frac{0.3}{1.1})$$
+Note that no linear approximation is required to obtain this asymptotical distribution since the test itself is linear. This leads to a more accurate variance-covariance to be estimated, which tends to give us a rejection rate closer to its asymptotical one.
+
+However, there are still two factors affecting our test size.  
+(1) The randomness of our variance-covariance estimator which will lead to heavy tail of our Wald test statistics given finite sample.    
+(2) The negative correlation between $\hat{\beta}_1$ and $\hat{\beta}_2$ will also lead to heavy tail of our Wald test statistics since it tends to give us a higher $W$. However, we can set the correlation between $X_1$ and $X_2$ (around $-0.255$ so that the correlation between $\hat{\beta}_1$ and $\hat{\beta}_2$ is equal to $0.3/1.1$) to remove this effect.  
+
+In sum, our Wald test will still be overjected even though our aymptotical variance is more accurate now.
+
   
-## Cross-Validation
+## Cross-Validation - data
 ```{r cv1}
 rm(list=ls())
 library(MASS)
@@ -157,6 +174,8 @@ crossval <- crossval_df %>%
 
 3. The resids_out line computes out-of-sample prediction residuals; .x and .y, refered to reg and test, respectively.
 
+## Cross-Validation - simulation results
+
 ```{r cv2}
 # MSE Summary #
 kable(crossval %>%
@@ -165,9 +184,9 @@ kable(crossval %>%
   digits = 3, caption = "Table 3. MSEs")
 ```
 
-1. Out-of-sample MSEs are larger than in-sample MSEs for both regressions, as expected.
-2. In-sample MSE smaller for reg2 as expected since MSE always decreases as more variables are added.
-3. Out-of-sample MSE slightly smaller for reg2 than for reg1, indicating that adding X2 does not increase the predictive power very much
+1. Out-of-sample MSEs are larger than in-sample MSEs for both regressions, as expected due to the possiblity of overfitting.  
+2. In-sample MSE smaller for reg2 as expected since MSE always decreases as more variables are added.  
+3. Out-of-sample MSE slightly smaller for reg2 than for reg1 which may be due to randomness since mse_out for the correct model (reg1) is expected to be relatively smaller than mse_out for the incorrect model (reg2).
 
 ```{r cv3}
 reg1 = lm(y~X[,1])
@@ -178,4 +197,4 @@ kable(data.frame(MSE1.out.hansen = mean((reg1$resid)^2/(1-hatvalues(reg1))^2),
       digits = 3, caption = "Table 4. Hansen Formula MSEs")
 ```
 
-Using the formula to compute MSE gives similar (exact) results as from the simulation. In the case of n-fold (Leave-one-out) CV, there is no randomness from the CV selection so they should match exactly.
+Using the formula to compute MSE gives similar (exact) results as those from the simulation. In the case of n-fold (Leave-one-out) CV, there is no randomness from the CV selection so they should match exactly.
