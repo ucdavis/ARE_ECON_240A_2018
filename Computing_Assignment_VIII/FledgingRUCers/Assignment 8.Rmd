@@ -1,0 +1,101 @@
+---
+title: "Assignment 8"
+author: "Fledging RUCers"
+date: "2018/3/15"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r echo=FALSE}
+library(MASS)
+library(broom)
+library(modelr)
+library(tidyverse)
+library(knitr)
+```
+
+## "Variances"
+```{r echo=FALSE}
+rm(list=ls())
+
+sim_reg <- function(n=100L, B=200){
+  ## DGP
+  Sigma <- matrix(c(1, 0.7, 0.7, 1), 2)
+  X <- mvrnorm(n=n, c(0, 0), Sigma = Sigma)
+  y <- 1.2 + 0.3*X[,1]+1.1*X[,2]+rnorm(n)
+  df <- data_frame(y=y, X1=X[,1], X2=X[,2])
+  
+  ## reg
+  reg <- lm(y~X1+X2, data=df)
+  reg_su <- summary(reg)
+  reg_co <- tidy(reg_su)
+  co_X1 <- reg_co$estimate[2]
+  co_X2 <- reg_co$estimate[3]
+  ratio <- co_X1/co_X2
+  
+  ## Delta
+  R <- matrix(c(0, 1/1.1, -0.3/1.1^2))
+  v <- as.numeric(t(R) %*% vcov(reg_su) %*% R) 
+  
+  ## W-test
+  W_test <- (ratio-.3/1.1)^2/v
+  
+  ## boot it:
+  x_boot <- modelr::bootstrap(df, n=B) %>%
+    mutate(reg=map(strap, ~lm(y~X1+X2, data=.)),
+           reg_su = map(reg, summary),
+           reg_co = map(reg_su, tidy),
+           ratio_b = map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+           R_b = map(reg_co, ~matrix(c(0, 1/co_X2, -co_X1/co_X2^2))),
+           vcov_b = map2_dbl(reg_su, R_b, ~as.numeric(t(.y) %*% vcov(.x) %*% .y)),
+           W_test_b  = map2_dbl(ratio_b, vcov_b, ~(.x-.3/1.1)^2/.y), 
+           W_test_b2 = map2_dbl(ratio_b, vcov_b, ~(.x-co_X1/co_X2)^2/.y)
+           )
+  x_boot2 <- x_boot %>%
+    summarise(boot_v = var(ratio_b),
+              boot_est_v = mean(vcov_b),
+              boot_mean = mean(ratio_b-ratio),
+              wtest_cval = quantile(W_test_b,.95),
+              wtest2_cval = quantile(W_test_b2,.95)
+             )
+  x_boot2
+
+  ## results:
+  data_frame(co_X1=co_X1, co_X2=co_X2, ratio=ratio, W_test=W_test,v=v) %>%
+             bind_cols(x_boot2)
+}
+
+set.seed(1111)
+results = replicate(200, sim_reg(), simplify = F) %>% bind_rows() %>%     
+          as_data_frame()
+
+kable(data.frame(exact = var(results$ratio),
+           asympt = mean(results$v),
+           boot = mean(results$boot_v)
+           ),
+      digits = 4, caption = "Variances"
+)
+```
+
+## 95% quantile Values of Wald Test and the Asymptotical distribution
+```{r echo=FALSE}
+kable(data.frame(wald.test = as.numeric(quantile(results$W_test,.95)), asymptotic.d = qchisq(.95,1), reject.rate=mean(results$W_test>qchisq(.95,1))), digits = 3, caption = "95% quantile Values of Wald Test and the Asymptotical distribution")
+```
+
+## Sizes of Wald tests
+```{r echo=FALSE}
+modified_wald = (results$ratio-.3/1.1)^2/results$boot_v
+test.size = data.frame(cbind(c(as.numeric(quantile(modified_wald,.95)), 
+                               mean(results$wtest_cval), 
+                               mean(results$wtest2_cval)),
+                  c(mean(1-pchisq(modified_wald, df=1) < .05), 
+                    mean(results$W_test>results$wtest_cval), 
+                    mean(results$W_test>results$wtest2_cval))
+                  ))
+dimnames(test.size)[[1]]=c("modified.wald", "boot.true", "boot.est")
+dimnames(test.size)[[2]]=c("critical.value","reject.rate")
+kable(test.size, digits = 3, caption = "Sizes of Wald tests")
+```
