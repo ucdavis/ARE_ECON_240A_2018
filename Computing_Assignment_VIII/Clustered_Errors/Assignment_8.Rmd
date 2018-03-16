@@ -92,3 +92,21 @@ crossval <- cv_df %>%
   gather(mse, value, mse_in, mse_out)
 ```
 
+## Cross Validation: The Crossval Data Frame
+
+The Cross Validation data frame is a $100 \times 3$ data frame, with 100 rows (corresponding to the number of observations in the sample) and three variables. The first variable is the training set (the sample containing the 99 observations not removed) and the second is the testing set (the one observation removed). The objects contained in both of these variables are themselves data frames (though they are stored as lists to manage storage space). The lists in train and test are length 2, but the data frames contained within are also $100 \times 3$. 
+
+## Cross Validation: Output Data Frame
+
+The output data frame contains the results of the regressions and the calculations of mean squared error. The _MSE_ column contains character strings that refer to whether the mean squared error value contained in _value_ is from the in-sample estimation or out-of-sample estimation. Similarly, the _model_ variable simply is an indicator for whether the regression results are from the regression of $y$ on $x_1$ alone or from $y$ on $x_1$ and $x_2$. 
+
+The variable `resids_out` is calculated by using the estimated regression model from the training set to predict values using the one observation left out of the sample (the testing set). Essentially, the `map_dbl` function takes values from the variables `reg` and `test`, which are are regression output and a data frame respectively, uses the function `predict` to predict $\hat{y}$ values, and calculates the residuals as $\hat{y} - y$. In this case, `.x` is the regression output stored in `reg`, and `.y` is the testing set in `test`. 
+
+```{r}
+
+```
+
+
+## Cross Validation: Summary of Results
+
+
