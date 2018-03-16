@@ -1,0 +1,139 @@
+---
+title: "Computing Assignment VIII"
+author: "YEP "
+date: "March 16, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+## Testing for the ratio of coefficients
+
+```{r }
+library(dplyr)
+library(MASS)
+library(broom)
+library(modelr)
+library(tidyverse)
+library(knitr)
+
+sim_reg <- function(n=100L, B=200){
+  Sigma <-matrix(c(1, 0.7, 0.7, 1), 2)
+  X <-mvrnorm(n=n,c(0, 0), Sigma = Sigma)
+  y <- 1.2 + 0.3*X[,1]+1.1*X[,2]+rnorm(n)
+  df <-data_frame(y=y, X1=X[,1], X2=X[,2])
+  ## reg
+  reg <-lm(y~X1+X2, data=df)
+  reg_su <-summary(reg)
+  reg_co <-tidy(reg_su)
+  co_X1 <- reg_co$estimate[2]
+  co_X2 <- reg_co$estimate[3]
+  
+  ratio <- co_X1/co_X2
+  ## Delta
+  R <- c(0,1/1.1,-0.3/(1.1)^2)
+  v <-as.numeric(t(R) %*%vcov(reg_su) %*% R)
+  
+  # W-test
+  W_test <- ((ratio-(0.3/1.1))^2)/v
+  
+  ## boot it:
+  x_boot <- modelr::bootstrap(df, n=B) %>%
+    mutate(reg=map(strap, ~lm(y~X1+X2, data=.)),
+           reg_su =map(reg, summary),
+           reg_co =map(reg_su, tidy),
+           ratio_b =map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+           R =map(reg_co, ~c(0, 1/co_X2, -co_X1/co_X2^2)),
+           vcov_b =map2_dbl(reg_su, R, ~t(.y) %*% vcov(.x) %*% .y),
+           W_test_b =map2_dbl(ratio_b, vcov_b, ~(.x-.3/1.1)^2/.y),
+           W_test_b2 =map2_dbl(ratio_b, vcov_b, ~(.x-co_X1/co_X2)^2/.y))
+  x_boot2 <- x_boot %>%
+    summarise(boot_sd=sd(ratio_b),
+              boot_sd_v =mean(vcov_b),
+              boot_mean=mean(ratio_b),
+              wtest_cval=quantile(W_test_b,.95),
+              wtest2_cval=quantile(W_test_b2,.95))
+ x_boot2
+ ## results: original Wald and va, and boot aggregates
+ data_frame(co_X1=co_X1, co_X2=co_X2, ratio=ratio,
+            W_test=W_test,
+            v=v) %>%
+   bind_cols(x_boot2)
+}
+
+table <- replicate(200, sim_reg(), simplify = F) %>% 
+  bind_rows() 
+kable(head(table[,-(5:8)],10))
+
+```
+
+1. Variance: exact, asymptotic, bootstrap
+
+```{r }
+var(table$ratio)
+mean(table$v)
+(mean(table$boot_sd))^2
+
+```
+
+## Cross-validation
+
+```{r }
+#Cross-validation
+
+select <- dplyr::select
+library(modelr)
+
+## generate data
+n <- 100
+S <-matrix(c(1, 0.5, 0.5, 1), 2)
+set.seed(2018)
+
+X <-mvrnorm(n = n, mu=c(0,0), Sigma=S)
+y <- 1.2 + 0.3 * X[,1]+rnorm(n)
+
+data_df <-data_frame(y=y, x1=X[,1], x2=X[,2])
+## cross validation
+crossval_df  <-crossv_kfold(data_df, k = n)
+
+crossval <-  crossval_df %>%
+  mutate(reg1 =map(train, ~lm(y~x1, data=.)),
+         reg2 =map(train, ~lm(y~x1+x2, data=.))) %>%
+  gather(model, reg, reg1, reg2) %>%
+  mutate(resids_out =map2_dbl(reg, test, ~predict(.x, newdata=.y)-as_data_frame(.y)$y),
+         mse_in =map_dbl(reg, ~mean(residuals(.)^2)),
+         mse_out =map_dbl(resids_out, ~mean(.^2))) %>%
+  gather(mse, value, mse_in, mse_out)
+```
+
+1. Dimension, class
+
+```{r }
+dim(crossval_df)
+class(crossval_df)
+```
+
+2. Results
+
+```{r }
+crossval2 <-  crossval %>%
+  group_by(model, mse) %>%
+  summarise(mean = mean(value))
+
+kable(crossval2)
+
+```
+
+3. Full data
+
+```{r }
+
+reg1 <- lm(y~x1,data_df)
+reg2 <-  lm(y~x1+x2,data_df)
+
+summary(reg1)
+summary(reg2)
+```
+
