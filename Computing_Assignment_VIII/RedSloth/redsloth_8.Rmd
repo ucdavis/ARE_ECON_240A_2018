@@ -144,6 +144,7 @@ sim_avg[7]
 Since the 95th percentile of the bootstrap Wald is so far out, we naturally fail to reject the null.
 
 # Cross-Validation
+
 ```{r, echo = FALSE}
 rm(list = ls())
 cat("\014")
