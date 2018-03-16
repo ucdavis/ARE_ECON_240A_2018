@@ -80,7 +80,7 @@ sim_reg <- function(n=100L, B=200){
 }
 
 set.seed(1234)
-results = replicate(200, sim_reg(), simplify = F) %>% bind_rows() %>%     
+results = replicate(200, sim_reg(), simplify = F) %>% bind_rows() %>%
           as_data_frame()
 
 kable(data.frame(exact = var(results$ratio), # Exact variance
@@ -108,7 +108,7 @@ modified_wald = (results$ratio-.3/1.1)^2/results$boot_v
 test.size = data.frame(cbind(c(as.numeric(quantile(modified_wald,.95)), 
                                mean(results$wtest_cval), 
                                mean(results$wtest2_cval)),
-                  c(mean(1-pchisq(modified_wald, df=1) < .05), 
+                  c(mean(modified_wald>qchisq(.95,1)), 
                     mean(results$W_test>results$wtest_cval), 
                     mean(results$W_test>results$wtest2_cval))
                   ))
@@ -132,11 +132,7 @@ For the alternative test based on $H_o: \beta_1 - \frac{0.3}{1.1} \beta_2 = 0$, 
 $$W=\frac{[\sqrt{n}(\hat{\beta}_1 - \beta_1) - \frac{0.3}{1.1}\sqrt{n}(\hat{\beta}_2-\beta_2)]^2} {\sigma^2 R'Q_{xx}^{-1}R}\rightarrow_d N(0, 1), R'=(0, 1, -\frac{0.3}{1.1})$$
 Note that no linear approximation is required to obtain this asymptotical distribution since the test itself is linear. This leads to a more accurate variance-covariance to be estimated, which tends to give us a rejection rate closer to its asymptotical one.
 
-However, there are still two factors affecting our test size.  
-(1) The randomness of our variance-covariance estimator which will lead to heavy tail of our Wald test statistics given finite sample.    
-(2) The negative correlation between $\hat{\beta}_1$ and $\hat{\beta}_2$ will also lead to heavy tail of our Wald test statistics since it tends to give us a higher $W$. However, we can set the correlation between $X_1$ and $X_2$ (around $-0.255$ so that the correlation between $\hat{\beta}_1$ and $\hat{\beta}_2$ is equal to $0.3/1.1$) to remove this effect.  
-
-In sum, our Wald test will still be overjected even though our aymptotical variance is more accurate now.
+However, there are still one factor affecting our test size. The randomness of our variance-covariance estimator which will lead to heavy tail of our Wald test statistics given finite sample. Therefore, our Wald test will still be overjected even though our aymptotical variance is more accurate now.
 
   
 ## Cross-Validation - data
