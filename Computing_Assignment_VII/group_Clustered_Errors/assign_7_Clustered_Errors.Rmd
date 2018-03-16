@@ -1,5 +1,9 @@
 ---
+<<<<<<< HEAD
+title: "Computing Assignment VII"
+=======
 title: "Assignment 7"
+>>>>>>> f0a60bc99da7aa219158ccf0aa661d7cbcedfd66
 author: "Clustered Errors"
 date: "March 9, 2018"
 output: ioslides_presentation
