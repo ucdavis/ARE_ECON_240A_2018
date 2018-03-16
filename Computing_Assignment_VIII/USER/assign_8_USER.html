@@ -110,10 +110,7 @@ USER
 <h2>Testing for the ratio of coefficients - alternative test</h2>
 <p>For the alternative test based on <span class="math inline">\(H_o: \beta_1 - \frac{0.3}{1.1} \beta_2 = 0\)</span>, our Wald test statistics is as follows:<br />
 <span class="math display">\[W=\frac{[\sqrt{n}(\hat{\beta}_1 - \beta_1) - \frac{0.3}{1.1}\sqrt{n}(\hat{\beta}_2-\beta_2)]^2} {\sigma^2 R'Q_{xx}^{-1}R}\rightarrow_d N(0, 1), R'=(0, 1, -\frac{0.3}{1.1})\]</span> Note that no linear approximation is required to obtain this asymptotical distribution since the test itself is linear. This leads to a more accurate variance-covariance to be estimated, which tends to give us a rejection rate closer to its asymptotical one.</p>
-<p>However, there are still two factors affecting our test size.<br />
-(1) The randomness of our variance-covariance estimator which will lead to heavy tail of our Wald test statistics given finite sample.<br />
-(2) The negative correlation between <span class="math inline">\(\hat{\beta}_1\)</span> and <span class="math inline">\(\hat{\beta}_2\)</span> will also lead to heavy tail of our Wald test statistics since it tends to give us a higher <span class="math inline">\(W\)</span>. However, we can set the correlation between <span class="math inline">\(X_1\)</span> and <span class="math inline">\(X_2\)</span> (around <span class="math inline">\(-0.255\)</span> so that the correlation between <span class="math inline">\(\hat{\beta}_1\)</span> and <span class="math inline">\(\hat{\beta}_2\)</span> is equal to <span class="math inline">\(0.3/1.1\)</span>) to remove this effect.</p>
-<p>In sum, our Wald test will still be overjected even though our aymptotical variance is more accurate now.</p>
+<p>However, there are still one factor affecting our test size. The randomness of our variance-covariance estimator which will lead to heavy tail of our Wald test statistics given finite sample. Therefore, our Wald test will still be overjected even though our aymptotical variance is more accurate now.</p>
 </div>
 <div id="cross-validation---data" class="slide section level2">
 <h2>Cross-Validation - data</h2>
