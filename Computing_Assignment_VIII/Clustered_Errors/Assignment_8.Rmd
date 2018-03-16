@@ -63,7 +63,24 @@ sim_reg <- function(n=100, B=200) {
 ```
 
 ```{r}
+simulations <- bind_rows(rerun(200, sim_reg()))
+print(quantile(simulations$W_test, probs = 0.95))
+simulations <- mutate(simulations, reject = (simulations$W_test >= 3.84))
+arr <- mean(simulations$reject)
+print(arr)
+
 results <- sim_reg()
+```
+
+# Question 1
+
+The asymptotic variance of the ratio is the 
+
+```{r}
+R<- c(1.1,-0.3)
+print(t(R) %*% Sigma %*% R)
+print(mean(simulations$boot_sd_v))
+print(var(simulations$boot_mean))
 ```
 
 
