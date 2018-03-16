@@ -1,0 +1,279 @@
+---
+title: "Computing Assignment 8"
+author: "TPP"
+date: "March 15, 2018"
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Testing for the ratio of coefficients
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(MASS) 
+library(broom) 
+library(modelr) 
+library(tidyverse)
+## n=100000000
+## 0.002363528
+
+set.seed(135791)
+
+
+
+sim_reg <- function(n, B){
+  Sigma <- matrix(c(1, 0.7, 0.7, 1), 2) 
+  X <- mvrnorm(n=n, c(0, 0), Sigma = Sigma) 
+  y <- 1.2 + 0.3*X[,1]+1.1*X[,2]+rnorm(n) 
+  df <- data_frame(y=y, X1=X[,1], X2=X[,2])
+  
+  
+reg <- lm(y~X1+X2, data=df) 
+reg_su <- summary(reg)
+reg_co <- tidy(reg_su) 
+co_int <- reg_co$estimate[1]
+co_X1 <- reg_co$estimate[2] 
+co_X2 <- reg_co$estimate[3]
+ratio <- co_X1/co_X2
+
+
+## Delta # 
+r <- matrix(c(0, 1/co_X2, -co_X1/(co_X2^2)), ncol=1) 
+v <- as.numeric(t(r) %*% vcov(reg_su) %*% r) * n
+b <- matrix(c(co_int,co_X1,co_X2), ncol=1)
+# W-test 
+
+W_test <- ((as.numeric(t(r) %*% b-0.3/1.1))^2)*((v)^(-1))
+
+## boot it: 
+x_boot <- modelr::bootstrap(df, n=B) %>% 
+  mutate(reg=map(strap, ~lm(y~X1+X2,data=.)),
+    reg_su = map(reg, summary), 
+    reg_co = map(reg_su, tidy), 
+    ratio_b = map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+    R = map(reg_co, ~c(0, 1/.$estimate[3], -.$estimate[2]/(.$estimate[3])^2)),
+    vcov_b = map2_dbl(reg_su, R, ~as.numeric(t(.y) %*% vcov(.x) %*% .y)))
+    
+x_boot2 <- x_boot %>% 
+  
+  summarise(boot_sd=sd(ratio_b),
+            boot_sd_v = mean(vcov_b), 
+            boot_mean=mean(ratio_b))
+    ## results: original Wald and va, and boot aggregates 
+    data_frame(co_X1=co_X1, co_X2=co_X2, ratio=ratio, v=v, w=W_test) %>% bind_cols(x_boot2)
+}  
+
+
+result <-rerun(200,sim_reg(100,200)) %>% bind_rows() %>% as.data.frame()
+
+exact_var <- sd(result$ratio)
+asym_var <- mean(result$v)
+boot_var <- mean(result$boot_sd)
+VAR<-cbind(exact_var,boot_var, asym_var)
+colnames(VAR) <- c("EXACT VARIANCE","BOOTSTRAP VARIANCE", "ASYMPTOTIC VARIANCE")
+
+VAR
+
+```
+Question 1
+Answer: The exact variance is the smallest, and not very different from the bootstrap one. The asymptotic variance is more than 10 times of the bootstrap one.Thus, we should expect to have a rejection rate well below 5%. 
+
+Question 2
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+Quant<- quantile(result$w, 0.95)
+Quant 
+```
+Answer: The quantile is very different from the 95% of the asymptotic $\chi^2_{(1)}$ distribution, 3.84. It is much smaller. 
+
+Question 3
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+Reject_asym <- result %>% mutate( q3_reject = ifelse( w<=3.84, 0, 1)) %>% select(., q3_reject) %>% colMeans()
+Reject_asym
+```
+Answer: The average rejection rate is 0, which is reasonable since the data was generated with the ratio equals the true ratio 0.3/1.1 in each simulaion. 
+
+Question 4
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+sim_reg2 <- function(n, B){
+  Sigma <- matrix(c(1, 0.7, 0.7, 1), 2) 
+  X <- mvrnorm(n=n, c(0, 0), Sigma = Sigma) 
+  y <- 1.2 + 0.3*X[,1]+1.1*X[,2]+rnorm(n) 
+  df <- data_frame(y=y, X1=X[,1], X2=X[,2])
+  
+  
+  reg <- lm(y~X1+X2, data=df) 
+  reg_su <- summary(reg)
+  reg_co <- tidy(reg_su) 
+  co_int <- reg_co$estimate[1]
+  co_X1 <- reg_co$estimate[2] 
+  co_X2 <- reg_co$estimate[3]
+  ratio <- co_X1/co_X2
+  
+  
+  ## Delta # 
+  r <- matrix(c(0, 1/co_X2, -co_X1/(co_X2^2)), ncol=1) 
+  v <- as.numeric(t(r) %*% vcov(reg_su) %*% r) * n
+  b <- matrix(c(co_int,co_X1,co_X2), ncol=1)
+  # W-test 
+  
+  W_boot <-(as.numeric(t(r) %*% b-0.3/1.1)^2)*(boot_var^(-1))
+  ## boot it: 
+  x_boot <- modelr::bootstrap(df, n=B) %>% 
+    mutate(reg=map(strap, ~lm(y~X1+X2,data=.)),
+           reg_su = map(reg, summary), 
+           reg_co = map(reg_su, tidy), 
+           ratio_b = map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+           R = map(reg_co, ~c(0, 1/.$estimate[3], -.$estimate[2]/(.$estimate[3])^2)),
+           vcov_b = map2_dbl(reg_su, R, ~as.numeric(t(.y) %*% vcov(.x) %*% .y)),
+           
+           W_test_b_boot = map_dbl(ratio_b, ~(( .x- 0.3/1.1 )^(2))*(boot_var^2)^(-1)), ## Wald stat centered at true with the bootstrap variance
+          W_test_b2_boot = map_dbl(ratio_b, ~(( .x- ratio )^(2))*(boot_var^2)^(-1)), ## with stat centered at estimates with the bootstrap variance
+           
+           reject_boot_true =ifelse(W_test_b_boot > 3.84,1,0),
+         reject_boot_est =ifelse (W_test_b2_boot > 3.84, 1, 0))
+          
+  
+  x_boot2 <- x_boot %>% 
+    summarise(boot_sd=sd(ratio_b),
+              boot_sd_v = mean(vcov_b), 
+              boot_mean=mean(ratio_b),
+              # reject_boot_var_est=mean(reject_boot_est),
+              reject_boot_var_true=mean(reject_boot_true))
+  ## results: original Wald and va, and boot aggregates 
+  data_frame(co_X1=co_X1, co_X2=co_X2, ratio=ratio, v=v, w_boot=W_boot) %>% bind_cols(x_boot2)
+}  
+
+
+
+significance <-  rerun(200,sim_reg2(100,200)) %>% bind_rows() %>% as.data.frame() %>% select(., reject_boot_var_true) %>% colMeans()
+significance
+```
+
+Question 5
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+sim_reg3 <- function(n, B){
+  Sigma <- matrix(c(1, 0.7, 0.7, 1), 2) 
+  X <- mvrnorm(n=n, c(0, 0), Sigma = Sigma) 
+  y <- 1.2 + 0.3*X[,1]+1.1*X[,2]+rnorm(n) 
+  df <- data_frame(y=y, X1=X[,1], X2=X[,2])
+  
+  
+  reg <- lm(y~X1+X2, data=df) 
+  reg_su <- summary(reg)
+  reg_co <- tidy(reg_su) 
+  co_int <- reg_co$estimate[1]
+  co_X1 <- reg_co$estimate[2] 
+  co_X2 <- reg_co$estimate[3]
+  ratio <- co_X1/co_X2
+  
+  
+  ## Delta # 
+  r <- matrix(c(0, 1/co_X2, -co_X1/(co_X2^2)), ncol=1) 
+  v <- as.numeric(t(r) %*% vcov(reg_su) %*% r) * n
+  b <- matrix(c(co_int,co_X1,co_X2), ncol=1)
+  # W-test 
+  
+  W_test <- ((as.numeric(t(r) %*% b-0.3/1.1))^2)*((v)^(-1))
+  ## boot it: 
+  x_boot <- modelr::bootstrap(df, n=B) %>% 
+    mutate(reg=map(strap, ~lm(y~X1+X2,data=.)),
+           reg_su = map(reg, summary), 
+           reg_co = map(reg_su, tidy), 
+           ratio_b = map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+           R = map(reg_co, ~c(0, 1/.$estimate[3], -.$estimate[2]/(.$estimate[3])^2)),
+           vcov_b = map2_dbl(reg_su, R, ~as.numeric(t(.y) %*% vcov(.x) %*% .y)),
+           
+           W_test_b_boot = map_dbl(ratio_b, ~(( .x- 0.3/1.1 )^(2))*(v)^(-1)), ## Wald stat centered at true with the bootstrap variance
+           W_test_b2_boot = map_dbl(ratio_b, ~(( .x- ratio )^(2))*(v)^(-1))) ## with stat centered at estimates with the bootstrap variance
+           
+          
+  
+  x_boot2 <- x_boot %>% 
+    summarise(boot_sd=sd(ratio_b),
+              boot_sd_v = mean(vcov_b), 
+              q_b = quantile(W_test_b_boot, .95),
+              q_b2 = quantile(W_test_b2_boot, .95),
+              boot_mean=mean(ratio_b))
+  ## results: original Wald and va, and boot aggregates 
+  data_frame(co_X1=co_X1, co_X2=co_X2, ratio=ratio, v=v, w=W_test) %>% bind_cols(x_boot2)
+}  
+
+resultQ5 <- rerun(200, sim_reg3(100,200)) %>% bind_rows() %>% as.data.frame() %>% mutate(reject_true= ifelse(w>q_b,1,0),reject_est=ifelse(w>q_b2,1,0)) %>% select(.,reject_true,reject_est) %>% colMeans()
+resultQ5
+```
+Question 6
+Answer: The size of the first bootstrap is smaller than 5%, while the size of the second bootstrap test, using the distribution approximated by the bootstrapped Wald is significantly larger. 
+##The right way of approximating the distribution is to center around the estimated ratio. Doing so gives us a false rejection rate of 30.5%. 
+
+Question 7
+Answer: The results will change for sure, since Wald is not invariant to the $r(\theta)$ functional form. 
+To be specific, here $r(\theta)=\beta_1-0.3/1.1\beta_2$, and $R'=(0.1 -0.3/1.1)$ 
+
+
+Cross-validation
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+select <- dplyr::select
+library(modelr)
+library(MASS)
+library(dplyr)
+library(tidyverse)
+
+## generate data
+n <- 100
+S <- matrix(c(1, 0.5, 0.5, 1), 2)
+set.seed(2018)
+X <- mvrnorm(n = n, mu=c(0,0), Sigma=S)
+y <- 1.2 + 0.3 * X[,1]+rnorm(n)
+data_df <- data_frame(y=y, x1=X[,1], x2=X[,2]) 
+
+## cross validation
+crossval_df <- crossv_kfold(data_df, k = n)
+crossval <- crossval_df %>%
+  mutate(reg1 = map(train, ~lm(y~x1, data=.)),
+         reg2 = map(train, ~lm(y~x1+x2, data=.))) %>%
+  gather(model, reg, reg1, reg2) %>%
+  mutate(resids_out = map2_dbl(reg, test, ~ predict(.x, newdata=.y)-as_data_frame(.y)$y),
+         mse_in = map_dbl(reg, ~mean(residuals(.)^2)),
+         mse_out = map_dbl(resids_out, ~mean(.^2))) %>% 
+  gather(mse, value, mse_in, mse_out)
+
+
+summary <- aggregate(crossval$value, by = list(crossval$model,crossval$mse), mean)
+
+
+residual_1 <- lm(y ~ x1, data = data_df) %>% residuals(.)
+residual_2 <- lm(y ~ x1 + x2, data = data_df) %>% residuals(.)
+
+X_1 = as.matrix(X[,1])
+M1 = diag(n) - X_1 %*% solve(t(X_1) %*% X_1) %*% t(X_1)
+M = diag(n) - X %*% solve(t(X) %*% X) %*% t(X)
+
+oos_mse_1 <- ( diag(M1)^(-2) %*% residual_1^(2) ) / n
+oos_mse_2 <- ( diag(M)^(-2) %*% residual_2^(2) ) / n
+```
+
+\begin{enumerate}
+\item 
+	\begin{enumerate}
+		\item  The dimension for $crossval\_df$ is $100 \times 3$. It is partitioned into 100 rows, one for each observation (n = 100). For each row, a single observation is removed from the overall data set, to become the "testing" data set, and the remaining n-1 observation are in the "training data set. Thus each cell in the "training" column is a list of 99 observations and each object in the "testing" column is one observation (list of a single element).  
+      	\item The columns $mse$ indicates the $MSE$ for both the in-sample and out-sample model. The column $model$ indicates whether the regression contains $X_2$ or not. The column $value$ contains the value mean squared error for either the "MSE in" or "MSE out" approach.   
+		\item The line $resids\_out = map2\_dbl(...)$ captures the residual from the test observation using the regression estimate from the training observations. Thus .x refers to the x values in the test observation and .y is the new y predicted using the test x values and the training regression coefficient(s).  
+\end{enumerate}
+\item 
+    \begin{enumerate}
+		\item  $MSE_{in_1}=1.198$ $>$ $MSE_{in_2}=1.164$       
+      	\item  $MSE_{out_1}=1.250$ $>$ $MSE_{out_2}=1.241$\\
+Thus we can see that for both "MSE in" and "MSE out" including an additional regression variable decreases mean squared error. This is consistent with the intuition that, generally, as regression variables are added mean squared error is non-increasing. 
+		\item $MSE_{in_1}=1.198$ $<$ $MSE_{out_1}=1.250$ and $MSE_{in_2}=1.164$ $<$ $MSE_{out_2}=1.241$\\
+        "MSE out" generates a larger error variance than "MSE in" for both model 1 and 2. This is likely due to the fact that "MSE out" is a function of a single error estimate, and thus is not averaged over larger and smaller values for all "MSE in" estimates. On average, a greater number of lower error values are included in all "MSE in" estimates, causing this error estimate to be lower.  
+        
+    \end{enumerate}
+\item 
+    \begin{enumerate}  
+		\item  Using the equation 3.47: $$\tilde{\sigma}^2= \frac{1}{n} \sum^n_{i=1} \tilde{e_i}^2=\frac{1}{n} \sum^n_{i=1} (1-h_{ii})^{-2} \hat{e_i}^2$$ We can calculate the out-of-sample MSE for both model. We get $MSE_{oos1}=1.22$ and $MSE_{oos2}=1.21$.   These two numbers are lower than the MSE from simulation. This is because Hansen's out of sample MSE has only removed one observation, thus we are estimating MSE on 99 observations, while each of our out of sample MSE's was based on a single observation. 
+    \end{enumerate}
+\end{enumerate}
