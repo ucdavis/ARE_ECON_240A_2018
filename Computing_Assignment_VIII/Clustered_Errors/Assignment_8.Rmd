@@ -55,10 +55,12 @@ sim_reg <- function(n=100, B=200) {
            W_test_b2 = map2_dbl(theta_b, vcov_b, ~ ((.x - theta_hat)^2)/.y))
   x_boot2 <- x_boot %>% 
     summarise(boot_sd = sd(theta_b),
-              boot_sd_v = mean(vcov_b),
-              boot_mean = mean(theta_b),
               wtest_cval = quantile(W_test_b, probs = c(0.95)),
-              wtest2_cval = quantile(W_test_b2, probs = c(0.95)))
+              wtest2_cval = quantile(W_test_b2, probs = c(0.95)),
+              W_test_b2 = mean(W_test_b2),
+              W_test_b = mean(W_test_b),
+              boot_sd_v = mean(vcov_b),
+              boot_mean = mean(theta_b))
   
   ## results: original Wald and va, and boot aggregates
   data_frame(co_X1 = co_X1, co_X2 = co_X2, theta = theta_hat, W_test = W_test, var = v_theta) %>% 
@@ -69,23 +71,20 @@ sim_reg <- function(n=100, B=200) {
 ```{r}
 simulations <- bind_rows(rerun(200, sim_reg()))
 print(quantile(simulations$W_test, probs = 0.95))
-simulations <- mutate(simulations, reject = (simulations$W_test >= 3.84))
-arr <- mean(simulations$reject)
-print(arr)
-
-results <- sim_reg()
+simulations <- mutate(simulations, reject_3 = (simulations$W_test >= 3.84), reject_4 = (simulations$W_test_b >=3.84), reject_5 = (simulations$W_test >= simulations$wtest_cval), reject_5_1 = (simulations$W_test >= simulations$wtest2_cval))
+arr_3 <- mean(simulations$reject_3)
+arr_4 <-mean(simulations$reject_4)
+arr_5 <- mean(simulations$reject_5)
+arr_5_1 <- mean(simulations$reject_5_1)
+print(c(arr_3, arr_4, arr_5, arr_5_1))
+print(mean(simulations$wtest2_cval))
 ```
 
-# Question 1
+# Comments
 
-The asymptotic variance of the ratio is the 
+We find that the average rejection rate over the bootstrap samples is 0 when using the bootstrap critical value using the hypothesis centered around the true value. This makes sense as the bootstrap critical value becomes very large.
 
-```{r}
-R<- c(1.1,-0.3)
-print(t(R) %*% Sigma %*% R)
-print(mean(simulations$boot_sd_v))
-print(var(simulations$boot_mean))
-```
+We used the linear test from the beginning. By doing this we gained efficiency by not needing to approximate the function using the delta method. 
 
 
 # Cross Validation
