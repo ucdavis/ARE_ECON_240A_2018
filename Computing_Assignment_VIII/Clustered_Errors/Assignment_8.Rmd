@@ -70,17 +70,15 @@ sim_reg <- function(n=100, B=200) {
 
 ```{r}
 simulations <- bind_rows(rerun(200, sim_reg()))
-print(quantile(simulations$W_test, probs = 0.95))
 simulations <- mutate(simulations, reject_3 = (simulations$W_test >= 3.84), reject_4 = (simulations$W_test_b >=3.84), reject_5 = (simulations$W_test >= simulations$wtest_cval), reject_5_1 = (simulations$W_test >= simulations$wtest2_cval))
 arr_3 <- mean(simulations$reject_3)
 arr_4 <-mean(simulations$reject_4)
 arr_5 <- mean(simulations$reject_5)
 arr_5_1 <- mean(simulations$reject_5_1)
-print(c(arr_3, arr_4, arr_5, arr_5_1))
-print(mean(simulations$wtest2_cval))
+
 ```
 
-# Comments
+## Comments
 
 We find that the average rejection rate over the bootstrap samples is 0 when using the bootstrap critical value using the hypothesis centered around the true value. This makes sense as the bootstrap critical value becomes very large.
 
