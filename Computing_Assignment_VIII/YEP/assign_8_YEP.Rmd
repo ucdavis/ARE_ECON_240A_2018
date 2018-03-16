@@ -9,7 +9,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
 ```
 
-## Q1
+## Testing for the ratio of coefficients
 
 ```{r }
 library(dplyr)
@@ -63,9 +63,19 @@ sim_reg <- function(n=100L, B=200){
    bind_cols(x_boot2)
 }
 
-table <- replicate(10, sim_reg(), simplify = F) %>% 
+table <- replicate(200, sim_reg(), simplify = F) %>% 
   bind_rows() 
-kable(table[,-(5:7)])
+kable(head(table[,-(5:8)],10))
+
+```
+
+1. Variance: exact, asymptotic, bootstrap
+
+```{r }
+var(table$ratio)
+mean(table$v)
+(mean(table$boot_sd))^2
+
 ```
 
 ## Cross-validation
@@ -96,24 +106,34 @@ crossval <-  crossval_df %>%
          mse_in =map_dbl(reg, ~mean(residuals(.)^2)),
          mse_out =map_dbl(resids_out, ~mean(.^2))) %>%
   gather(mse, value, mse_in, mse_out)
+```
 
-##Q1
+1. Dimension, class
+
+```{r }
 dim(crossval_df)
 class(crossval_df)
+```
+
+2. Results
+
+```{r }
+crossval2 <-  crossval %>%
+  group_by(model, mse) %>%
+  summarise(mean = mean(value))
+
+kable(crossval2)
 
 ```
 
-## IV
+3. Full data
 
 ```{r }
 
+reg1 <- lm(y~x1,data_df)
+reg2 <-  lm(y~x1+x2,data_df)
 
-```
-
-## IV
-
-```{r }
-
-
+summary(reg1)
+summary(reg2)
 ```
 
