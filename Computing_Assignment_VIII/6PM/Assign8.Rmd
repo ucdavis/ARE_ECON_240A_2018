@@ -100,7 +100,7 @@ size_test <- simu_gr %>%
          reject_bvar = (W_test_bvar > qchisq(0.95,df=1)),
          sig_bvar = 1- pchisq(W_test_bvar, df = 1)) %>%
   summarise(var_ratio = var(ratio),
-            #mean_v = mean(v),
+            mean_v = mean(v),
             mean_boot_var = mean(boot_var),
             q_Wtest = quantile(W_test, probs = 0.95),
             #mean_wtest2_cval = mean(wtest2_cval),
@@ -118,43 +118,36 @@ size_test <- simu_gr %>%
 
 ```{r variance}
 variance <- size_test %>%
-  select(var_ratio, Avar, mean_boot_var, q_Wtest,q_chisq)
-kable(variance, digits = 3, align = "c", col.names = c("var_ratio","asymp.var", "bootstrap_var","q_Wtest","q_chisq"))
+  select(var_ratio, mean_v, Avar, mean_boot_var, q_Wtest,q_chisq)
+kable(variance, digits = 3, align = "c", col.names = c("var_ratio","est_aymp.var", "theo_asyp.var" ,"bootstrap_var","q_Wtest","q_chisq"))
 ```
 
-- Q1: The exact variance of our ratio is `r round(variance$var_ratio, 3)`, compared with the asymptotic one (`r variance$Avar`) and bootstrap one (`r round(variance$mean_boot_var, 3)`), we find that the bootstrap one is usually the largest while the asymptotic one is the smallest. 
+- Q1: The exact variance of our ratio is `r round(variance$var_ratio, 3)`, compared with the estimated asymptotic one (`r round(variance$mean_v,3)`) and bootstrap one (`r round(variance$mean_boot_var, 3)`), we find that the bootstrap one is usually the largest, and in most cases, the asymptotic one is the smallest. 
 
-- Based on this, we expect the rejection rate using asymptotic distribution to be below 5%, while the rejection rate using bootstrap critical value to be above 5%.
+- Based on this, if the exact variance is larger than the asymptotic one, we expect the rejection rate using asymptotic distribution to be below 5%, vice versa. However, since the bootstrap variance is the largest, we expect the rejection rate using bootstrap critical value to be above 5%.
 
 - Q2: The 95% quantile of our Wald tests is `r round(variance$q_Wtest, 3)`, and the asymptotic one is `r round(variance$q_chisq, 3)`.
 
 ## Comparing different tests
 ```{r tests}
 tests <- size_test %>%
-  select(size_a, mean_sig_bvar)
-kable(tests, digits = 3, align = "c", col.names = c("size_asymp","ave_sig_bvar"))
+  select(size_a, mean_sig_bvar, size_bvar, size_b, size_b2)
+kable(tests, digits = 3, align = "c", col.names = c("size_asymp","ave_sig_bvar","size_b_var", "size_b","size_b2"))
 ```
 
 - Q3: The average rejection rate of the Wald test using the asymptotic distribution is `r round(tests$size_a, 3)`. 
 
-- Q4: Replaced by bootstrap variance estimate, the average significance of modified Wald test is `r round(tests$mean_sig_bvar,3)`.
+- Q4: Replaced by bootstrap variance estimate, the average significance (p-value) of modified Wald test is `r round(tests$mean_sig_bvar,3)`. Since most of the time, we can't reject the null, it makes sense, the p-value is away from 0.05.
 
-- Q5: 
+-------- 
 
+- Q5: We're focusing on the size (instead of p-value) for this question. The rejection rate of Wald test using the bootstrap critical value centered at 0.3/1.1 is 0, while using the bootstrap critical value centered at the sample estimate, it's above 5%.
 
-## Comparing the sizes of different tests
+- Q6: It depends on the simulation. If the exact variance is larger than the asymptotic one, the Wald statistic tends to be smaller, the rejection rate will be below 5%. 
 
-```{r size}
-size <- size_test %>%
-  select(size_a, size_bvar, size_b, size_b2)
-kable(size, digits = 3, align = "c", col.names = c("size_asymp","size_b_var", "size_b","size_b2"))
-```
+- Since bootstrap variance is larger than the asymptotic one, the Wald statistics using bootstrap variance will be smaller, which leads to higher rejection rate than the asymptotic one. 
 
-- Since the exact variance is usually larger than the asymptotic one, the Wald statistic tends to be smaller, the rejection rate will be below 5%.
-
-- Since bootstrap variance is larger than the asymptotic one, the Wald statistics using bootstrap variance will be smaller, which leads to over-rejection (`r size$size_bvar`). 
-
-- Since bootstrap variance is so large, the critical value of the Wald statistic centered around $\beta_1/\beta_2$ is so small that we will never reject the null. However, if we center the Wald statistic around sample estimate, we get over-rejection.
+- Since bootstrap variance is so large, the critical value of the Wald statistic centered around $\beta_1/\beta_2$ is so small that we will never reject the null. However, if we center the Wald statistic around sample estimate, we get over-rejection as expected.
 
 ## Alternative test
 
@@ -203,6 +196,35 @@ outofsample <- reg_df %>%
 ```
 
 ## Cross Validation
-```{r cv}
-kable(MSE, digits = 3)
+
+```{r q}
+dim(crossval_df)
+typeof(crossval_df)
 ```
+
+- The each cell of train contains $99 \times 4$, each cell of test contains $1 \times 4$, and id.
+- mse contains the method we use to calculate mean square error, i.e., in-sample or out-sample MSE. 
+- model indicates the regression we use, short (with only x1) or long (both x1 and x2).
+- value contains the corresponding MSE.
+- resids_out calculates the prediction error for test sample using the estimates from train sample. .x refers to the regression, .y refers to the test sample.
+
+## MSE comparison
+
+```{r cv}
+kable(MSE, digits = 3, align = "c")
+```
+
+- For in-sample MSE, using the seed(2018), we find that the short regression has larger mean square error than the long regression. Explanation: this is mainly due to the fact that adding more variables will decrease the residuals, improving the MSE. But the difference is small since x2 is irrelevant to y. 
+
+----------
+
+- For out-sample MSE, using the seed(2018), we find the same result as above. We find no big difference in MSE between short regression and long regression for the full sample, since adding irrelevant X2 into the model can hardly improve the model.
+
+- For each model, in-sample MSE is always smaller than out-sample MSE. The reason is that since the fitted model excludes the test sample, the coefficient estimated from the train sample will inflate the error each sample, i.e., $|\tilde{e}_i| = (1-h_{ii})^{-1}|\hat{e}_i| > |\hat{e}_i|$.
+
+## Out-of-sample MSE on full data
+```{r mse_full}
+kable(outofsample, digits = 3, align = "c")
+```
+
+- We find they are exactly the same as the simulated cross validation out-sample results.

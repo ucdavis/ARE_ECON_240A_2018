@@ -1,0 +1,198 @@
+---
+title: "Computing Assignment VIII"
+author: "redSloth: Tyler Hoppenfield, Daniel Mather, Iwunze Ugo"
+date: "March 15, 2018"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Wald Test
+* Our distance metric will be $\frac{\hat{\beta_1}}{\hat{\beta_2}}-\frac{.3}{1.1}$
+* using the delta method, this is asymptotically distributed as follows:
+$$N(0,  R' n\hat{V}_{\hat{\theta}}^{-1}R))$$
+ $$ R'=(0, \frac{1}{\beta _2}, - \frac{\beta_1}{\beta _2^2}) $$
+ $$ \hat{\theta} =  \frac{\hat{\beta_1}}{\hat{\beta_2}}$$
+
+
+
+```{r, include = FALSE}
+
+library(MASS)
+library(broom)
+library(modelr)
+library(tidyverse)
+Sigma <- matrix(c(1, 0.7, 0.7, 1), 2)
+
+
+
+sim_reg <- function(n=100, B=200){
+
+  Sigma <- matrix(c(1, 0.7, 0.7, 1), 2)
+  X <- mvrnorm(n=n, c(0, 0), Sigma = Sigma)
+  y <- 1.2 + 0.3*X[,1]+1.1*X[,2]+rnorm(n)
+  df <- data_frame(y=y, X1=X[,1], X2=X[,2])
+
+  ## reg
+  reg <- lm(y~X1+X2, data=df)
+  reg_su <- summary(reg)
+  reg_co <- tidy(reg_su)
+  co_X1 <- reg_co$estimate[2]
+  co_X2 <- reg_co$estimate[3]
+  ratio <- co_X1/co_X2
+  ## Delta
+  R <- t(cbind(0,1/1.1,-1*0.3/(1.1^2)))
+  v <- as.numeric(t(R) %*% vcov(reg_su) %*% R)
+  # W-test
+  W_test <- (ratio - 0.3/1.1)^2/v
+  ## boot it:
+  x_boot <- modelr::bootstrap(df, n=B) %>%
+    mutate(reg = map(strap, ~lm(y~X1+X2, data=.)),
+           reg_su = map(reg, summary),
+           reg_co = map(reg_su, tidy),
+           ratio_b = map_dbl(reg_co, ~.$estimate[2]/.$estimate[3]),
+           R = map(reg_co, ~c(0, 1/.$estimate[3], -.$estimate[2]/.$estimate[3]^2)),
+           vcov_b = map2_dbl(reg_su, R, ~t(.y) %*% vcov(.x) %*% .y),
+           W_test_b = map2_dbl(ratio_b, vcov_b, ~(.x - 0.3/1.1)^2/.y),
+           W_test_b2 = map2_dbl(ratio_b, vcov_b, ~(.x - ratio)^2/.y))
+
+  x_boot2 <- x_boot %>% 
+    summarise(boot_var = var(ratio_b),
+              boot_var_mean = mean(vcov_b), 
+              boot_mean = mean(ratio_b),
+              wtest_cval = quantile(W_test_b,probs = 0.95),
+              wtest_reject = mean(W_test_b >= qchisq(0.95,df=1)),
+              wtest2_cval = quantile(W_test_b2,probs = 0.95),
+              wtest2_reject = mean(W_test_b2 >= qchisq(0.95,df=1)),
+              wald_q4 = mean(as.numeric(t(ratio_b - 0.3/1.1)*boot_var_mean*(ratio_b - 0.3/1.1)))
+              )
+x_boot2
+## results: original Wald and va, and boot aggregates
+data_frame(co_X1=co_X1, 
+           co_X2=co_X2, 
+           ratio=ratio,
+           W_test=W_test,
+           v=v,
+           crit= qchisq(0.95,df=1)
+) %>%
+  bind_cols(x_boot2)
+}
+
+sim_reg()
+```
+
+
+``` {r loopup, include = FALSE}
+sim_results <- sim_reg()
+cbind(sim_results, pchisq(as.numeric(sim_results[4]), df = 197, lower.tail = FALSE))
+for (i in 1:19) {
+  temp <- sim_reg()
+  cbind(temp, pchisq(as.numeric(temp[4]), df = 197, lower.tail = FALSE))
+  sim_results <- rbind(temp, sim_results)
+}
+
+sim_avg <- colMeans(sim_results)
+ratio_squared <- (sim_results[,3])^2
+ratio_squared_avg <- colMeans(ratio_squared)
+ratio_var <-  ratio_squared_avg[1] - (sim_avg[3])^2 
+```  
+# Simulations
+Our exact variance of the ratio is:
+``` {r, echo = FALSE}
+ratio_var
+```
+Our asymptotic variance is:
+```{r, echo=FALSE}
+sim_avg[5]
+```
+
+our bootstrapped variance is:
+
+``` {r, echo = FALSE}
+sim_avg[9]
+```
+
+Based on these, we expect to reject the null hypothesis too often with the bootstrap Wald test.
+
+# Actual wald distributions with entire sample
+``` {r, echo = FALSE}
+sim_avg[4]
+```
+
+# Boostrap Wald statistics
+
+Bootstrap centered on the correct null hypothesis (95th percentile of bootstrap values, percent reject using the correct distribution)
+``` {r, echo = FALSE}
+sim_avg[11]
+sim_avg[12]
+```
+
+Bootstrap centered on the sample mean null hypothesis (95th percentile of bootstrap values, percent reject using the correct distribution)
+``` {r, echo = FALSE}
+sim_avg[13]
+sim_avg[14]
+```
+We reject the null too often with bootstrap methods.
+
+# Question 4: modified Wald test with bootstrap variance estimator
+```{r, echo = FALSE}
+sim_avg[7]
+```
+
+# Question 5
+Since the 95th percentile of the bootstrap Wald is so far out, we naturally fail to reject the null.
+
+# Cross-Validation
+```{r, echo = FALSE}
+rm(list = ls())
+cat("\014")
+
+library(tidyverse)
+library(MASS)
+
+# the package:MASS overwrote the function 'select'; redefine 'select' as the function from dplyr
+select <- dplyr::select
+
+library(modelr)
+
+# generate data
+n <- 100
+S <- matrix(c(1, 0.5, 0.5, 1), 2)
+set.seed(2018)
+X <- mvrnorm(n = n, mu = c(0,0), Sigma = S)
+y <- 1.2 + 0.3 * X[,1] + rnorm(n)
+
+data_df <- data.frame(y = y, x1 = X[,1], x2 = X[,2])
+
+# cross validation
+crossval_df <- crossv_kfold(data_df, k = n)
+
+crossval <- crossval_df %>%
+  mutate(reg1 = map(train, ~lm(y ~ x1, data = .)),
+         reg2 = map(train, ~lm(y ~ x1 + x2, data = .))) %>%
+  gather(model, reg, reg1, reg2) %>%
+  mutate(resids_out = map2_dbl(reg, test, ~ predict(.x, newdata = .y) - as.data.frame(.y)$y),
+         mse_in = map_dbl(reg, ~mean(residuals(.)^2)),
+         mse_out = map_dbl(resids_out, ~mean(.^2))) %>%
+  gather(mse, value, mse_in, mse_out)
+
+mean.reg1.mse.in <- round(mean(crossval$value[1:100]), 3)
+mean.reg2.mse.in <- round(mean(crossval$value[101:200]), 3)
+mean.reg1.mse.out <- round(mean(crossval$value[201:300]), 3)
+mean.reg2.mse.out <- round(mean(crossval$value[301:400]), 3)
+
+mse.table = data.frame(reg1.in = mean.reg1.mse.in, reg2.in = mean.reg2.mse.in, reg1.out = mean.reg1.mse.out, reg2.out = mean.reg2.mse.out)
+```
+
+The data frame, “crossval_df”, is 100 rows by 3 columns. Each row in the column, “test” contains a randomly chosen triple (y, x1, x2) from the 100 simulated observations. It is 1 row by 3 columns. Each row in the “train” column contains the other 99 observations. The column, “id” specifies which of the 100 observations is selected. It is 99 rows by 3 columns.
+
+The column, “model” in the data frame, “crossval” contains an indicator for the type of regression which is run on the data contained in “train”. The column, “mse” similarly contains an indicator for the type of mse’s that are calculated (one for the in sample regressions, and another for the out-sample predictions). The column, “value” contains the mse’s for the in-sample and out-sample regressions for both of the regression models.
+
+The column, “resids_out” gives the residuals from the out-sample regression. It takes the difference in the predicted value of y and the actual value of y. The ".x" is the independent variable from the excluded observation, which is used to predict dependent variable.
+
+# Mean squared errors
+```{r tables, echo = FALSE, warning=FALSE}
+library(knitr)
+kable(mse.table)
+```
